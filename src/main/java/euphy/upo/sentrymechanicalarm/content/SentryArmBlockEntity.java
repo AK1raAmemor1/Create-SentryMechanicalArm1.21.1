@@ -992,6 +992,21 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
                 fakePlayer, heldItem, fakeHeldItem, iGunFake, operator, dataHolder, gunIndex, actuallyFired, mode
         );
 
+        String currentScriptDataStr = getLuaDataSnapshot(ctx.dataHolder.scriptData);
+        float currentAimingProgress = ctx.operator.getSynAimingProgress();
+
+        boolean isScriptChanging = !currentScriptDataStr.equals(this.lastScriptDataStr);
+        boolean isProgressChanging = Math.abs(currentAimingProgress - this.lastAimingProgress) > 0.001f;
+        this.lastScriptDataStr = currentScriptDataStr;
+        this.lastAimingProgress = currentAimingProgress;
+
+        boolean isGunActive = ctx.actuallyFired || isScriptChanging || isProgressChanging;
+
+        if (isGunActive && !this.wasCharging) {
+            sendActionPacket(euphy.upo.sentrymechanicalarm.network.SentryShootPacket.ActionType.CHARGE);
+        }
+        this.wasCharging = isGunActive;
+
         switch (result) {
             case NEED_BOLT -> handleNeedBolt(ctx);
             case NO_AMMO -> handleNoAmmo(ctx);
@@ -1187,6 +1202,7 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
 
         String currentScriptDataStr = getLuaDataSnapshot(ctx.dataHolder.scriptData);
         float currentAimingProgress = ctx.operator.getSynAimingProgress();
+
         boolean isScriptChanging = !currentScriptDataStr.equals(this.lastScriptDataStr);
         boolean isProgressChanging = Math.abs(currentAimingProgress - this.lastAimingProgress) > 0.001f;
         this.lastScriptDataStr = currentScriptDataStr;
@@ -1194,9 +1210,6 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
 
         boolean isGunActive = ctx.actuallyFired || isScriptChanging || isProgressChanging;
 
-        if (isGunActive && !this.wasCharging) {
-            sendActionPacket(euphy.upo.sentrymechanicalarm.network.SentryShootPacket.ActionType.CHARGE);
-        }
         this.wasCharging = isGunActive;
 
         if (ctx.actuallyFired) {
