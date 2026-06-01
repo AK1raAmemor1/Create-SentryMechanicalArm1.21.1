@@ -95,8 +95,8 @@ dependencies {
         isTransitive = false
     }
 
-    // Registrate (Create's dependency, needed explicitly when using :slim)
-    implementation("com.tterrag.registrate:Registrate:MC1.21-1.3.0+67")
+    // Registrate (Create's dependency, types exposed through Create's API)
+    compileOnly("com.tterrag.registrate:Registrate:MC1.21-1.3.0+67")
 
     // Ponder
     implementation(libs.ponder)
@@ -112,8 +112,8 @@ dependencies {
     // EMI - recipe viewer
     compileOnly(libs.emi)
 
-    // LuaJ - for script support
-    implementation("org.luaj:luaj-jse:3.0.1")
+    // LuaJ - for script support, bundled via jarJar
+    compileOnly("org.luaj:luaj-jse:3.0.1")
 
     // TaCZ (Timeless and Classics Guns Zero) - NeoForge 1.21.1 version from Modrinth Maven
     implementation("maven.modrinth:tacz-1.21.1:1.1.8-r2")

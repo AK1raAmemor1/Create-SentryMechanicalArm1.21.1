@@ -35,7 +35,7 @@ config = "sentrymechanicalarm.mixins.json"
 
 [[dependencies.sentrymechanicalarm]]
     modId = "tacz"
-    type = "required"
+    type = "optional"
     versionRange = "[1.1.8,)"
     ordering = "NONE"
     side = "BOTH"
