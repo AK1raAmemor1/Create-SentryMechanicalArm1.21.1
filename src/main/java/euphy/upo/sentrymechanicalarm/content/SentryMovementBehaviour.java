@@ -25,7 +25,6 @@ import euphy.upo.sentrymechanicalarm.network.SentryClientShootPacket;
 import euphy.upo.sentrymechanicalarm.network.SentryContraptionShootPacket;
 import euphy.upo.sentrymechanicalarm.util.SentryFakePlayer;
 import euphy.upo.sentrymechanicalarm.util.TargetPool;
-import euphy.upo.sentrymechanicalarm.content.SentryArmBlock;
 import net.createmod.catnip.animation.LerpedFloat;
 import net.createmod.catnip.math.VecHelper;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -36,7 +35,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -566,10 +564,6 @@ public class SentryMovementBehaviour implements MovementBehaviour {
         }
 
         FakePlayer fp = SentryFakePlayer.getForContraption(serverLevel, context.contraption.entity.getUUID(), context.localPos);
-        if (fp == null) {
-            SentryMechanicalArm.LOGGER.info("[SentryDebug] FIRE_FAIL reason=fakePlayerNull");
-            return false;
-        }
 
         double feetY = barrelGlobalPos.y - 1.62;
         fp.setPos(barrelGlobalPos.x, feetY, barrelGlobalPos.z);
@@ -609,7 +603,7 @@ public class SentryMovementBehaviour implements MovementBehaviour {
         boolean consumedExternal = false;
 
         if (hasInternal) {
-            if (!iGun.hasBulletInBarrel(gunStack) && currentInternalAmmo > 0) {
+            if (!iGun.hasBulletInBarrel(gunStack)) {
                 iGun.reduceCurrentAmmoCount(gunStack);
                 iGun.setBulletInBarrel(gunStack, true);
                 currentInternalAmmo--;
@@ -649,7 +643,7 @@ public class SentryMovementBehaviour implements MovementBehaviour {
             }
         }
 
-        if (result != ShootResult.SUCCESS && hasExternal && requiredAmmoId != null) {
+        if (result != ShootResult.SUCCESS && hasExternal) {
             ItemStack fpGun = fp.getMainHandItem();
             IGun iGunFp = IGun.getIGunOrNull(fpGun);
             if (iGunFp != null) {
@@ -753,13 +747,9 @@ public class SentryMovementBehaviour implements MovementBehaviour {
                         }
                     }
                 }
-                if (consumedInternal) {
-                    iGun.setCurrentAmmoCount(gunStack, currentInternalAmmo);
-                }
+                iGun.setCurrentAmmoCount(gunStack, currentInternalAmmo);
             } else {
-                if (consumedInternal) {
-                    iGun.setCurrentAmmoCount(gunStack, currentInternalAmmo - 1);
-                }
+                iGun.setCurrentAmmoCount(gunStack, currentInternalAmmo - 1);
             }
 
             refillAmmoBoxesFromContraption(context, virtualBE, requiredAmmoId);
@@ -828,7 +818,7 @@ public class SentryMovementBehaviour implements MovementBehaviour {
                         if (requiredAmmoId.equals(ammoItem.getAmmoId(slotStack))) ammoIdMatch = true;
                     } else {
                         ResourceLocation itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(slotStack.getItem());
-                        if (itemId != null && itemId.equals(requiredAmmoId)) ammoIdMatch = true;
+                        if (itemId.equals(requiredAmmoId)) ammoIdMatch = true;
                     }
                     if (!ammoIdMatch) continue;
                     int taken = Math.min(needed, slotStack.getCount());
@@ -1203,7 +1193,7 @@ public class SentryMovementBehaviour implements MovementBehaviour {
                     if (iAmmoItem.getAmmoId(stack).equals(requiredAmmoId)) isLooseMatch = true;
                 } else {
                     ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-                    if (itemId != null && itemId.equals(requiredAmmoId)) isLooseMatch = true;
+                    if (itemId.equals(requiredAmmoId)) isLooseMatch = true;
                 }
                 if (isLooseMatch) {
                     if (simulate) {

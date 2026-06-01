@@ -114,15 +114,26 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
     private Vec3 markedWorldPos = null;
     private int markedContraptionEntityId = -1;
     private BlockPos markedLocalPos = null;
+    private boolean isSableMarked = false;
+    private Vec3 sableMarkedLocalPos = null;
 
     public Vec3 getMarkedWorldPos() { return markedWorldPos; }
     public int getMarkedContraptionEntityId() { return markedContraptionEntityId; }
     public BlockPos getMarkedLocalPos() { return markedLocalPos; }
+    public boolean isSableMarked() { return isSableMarked; }
+    public Vec3 getSableMarkedLocalPos() { return sableMarkedLocalPos; }
 
     public void setMarkedPos(Vec3 worldPos, int contraptionEntityId, BlockPos localPos) {
+        setMarkedPos(worldPos, contraptionEntityId, localPos, false, null);
+    }
+
+    public void setMarkedPos(Vec3 worldPos, int contraptionEntityId, BlockPos localPos,
+                              boolean isSable, Vec3 sableLocal) {
         this.markedWorldPos = worldPos;
         this.markedContraptionEntityId = contraptionEntityId;
         this.markedLocalPos = localPos;
+        this.isSableMarked = isSable;
+        this.sableMarkedLocalPos = isSable ? sableLocal : null;
         clearMarkedEntity();
         setChanged();
         sendData();
@@ -133,6 +144,8 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
             markedWorldPos = null;
             markedContraptionEntityId = -1;
             markedLocalPos = null;
+            isSableMarked = false;
+            sableMarkedLocalPos = null;
             setChanged();
             sendData();
         }
@@ -170,6 +183,12 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
             if (markedLocalPos != null) {
                 compound.putLong("MarkedLocalPos", markedLocalPos.asLong());
             }
+            if (isSableMarked && sableMarkedLocalPos != null) {
+                compound.putBoolean("IsSableMarked", true);
+                compound.putDouble("SableLocalX", sableMarkedLocalPos.x);
+                compound.putDouble("SableLocalY", sableMarkedLocalPos.y);
+                compound.putDouble("SableLocalZ", sableMarkedLocalPos.z);
+            }
         }
     }
 
@@ -204,10 +223,18 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
             } else {
                 markedLocalPos = null;
             }
+            isSableMarked = compound.getBoolean("IsSableMarked");
+            if (isSableMarked) {
+                sableMarkedLocalPos = new Vec3(compound.getDouble("SableLocalX"), compound.getDouble("SableLocalY"), compound.getDouble("SableLocalZ"));
+            } else {
+                sableMarkedLocalPos = null;
+            }
         } else {
             markedWorldPos = null;
             markedContraptionEntityId = -1;
             markedLocalPos = null;
+            isSableMarked = false;
+            sableMarkedLocalPos = null;
         }
     }
 

@@ -49,7 +49,9 @@ public class AeronauticsHelper {
     /** Project a sub-level position to global world space (safe no-op if not in sub-level). */
     public static Vec3 sableSubLevelToWorld(Level level, Vec3 localPos) {
         if (level == null) return localPos;
-        return SableCompanion.INSTANCE.projectOutOfSubLevel(level, localPos);
+        SubLevelAccess access = SableCompanion.INSTANCE.getContaining(level, BlockPos.containing(localPos));
+        if (access == null) return localPos;
+        return access.logicalPose().transformPosition(localPos);
     }
 
     /** Convert a world-space position back to sub-level space using the containing sub-level's inverse pose. */

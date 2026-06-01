@@ -91,7 +91,9 @@ public class SentryClientInputHandler {
                     BlockPos localPos = BlockPos.ZERO;
                     Vec3 contraptionCheckPos = hitPos;
                     Vec3 packetPos = hitPos;
+                    Vec3 sableLocalPos = null;
                     if (inSubLevel) {
+                        sableLocalPos = hitPos;
                         packetPos = AeronauticsHelper.sableSubLevelToWorld(player.level(), hitPos);
                     }
                     for (AbstractContraptionEntity ace : player.level().getEntitiesOfClass(
@@ -105,7 +107,8 @@ public class SentryClientInputHandler {
                             break;
                         }
                     }
-                    PacketDistributor.sendToServer(new SentryMarkPosPacket(fcPos, packetPos, contraptionId, localPos));
+                    PacketDistributor.sendToServer(new SentryMarkPosPacket(fcPos, packetPos, contraptionId, localPos,
+                            inSubLevel, java.util.Optional.ofNullable(sableLocalPos)));
                     player.playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.6f, 1.5f);
                     lastMarkTime = System.currentTimeMillis();
                 }

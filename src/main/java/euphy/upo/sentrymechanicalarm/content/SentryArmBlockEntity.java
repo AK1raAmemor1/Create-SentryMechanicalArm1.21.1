@@ -74,6 +74,8 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
     private Vec3 cachedMarkedPos = null;
     private int cachedMarkedContraptionId = -1;
     private BlockPos cachedMarkedLocalPos = null;
+    private boolean isSableMarked = false;
+    private Vec3 sableMarkedLocalPos = null;
     private int markedPosShotCounter = 0;
     private boolean isCurrentTargetMarkedPos = false;
     private int markedPosUpdateTimer = 0;
@@ -252,6 +254,8 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
     public void tick() {
         super.tick();
 
+        if (level == null) return;
+
         baseAngle.tickChaser();
         lowerArmAngle.tickChaser();
         upperArmAngle.tickChaser();
@@ -293,9 +297,7 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
 
                     if (handItem.getItem() instanceof com.tacz.guns.api.item.gun.AbstractGunItem gunItem) {
                         com.tacz.guns.api.entity.IGunOperator operator = com.tacz.guns.api.entity.IGunOperator.fromLivingEntity(fakePlayer);
-                        if (operator != null) {
-                            gunItem.tickHeat(operator.getDataHolder(), handItem, fakePlayer);
-                        }
+                        gunItem.tickHeat(operator.getDataHolder(), handItem, fakePlayer);
                     }
                 }
 
@@ -835,8 +837,8 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
             cachedTrackedMarkedPos = null;
             return null;
         }
-        if (isInSableSubLevel()) {
-            Vec3 projected = AeronauticsHelper.sableSubLevelToWorld(this.level, cachedMarkedPos);
+        if (isSableMarked && sableMarkedLocalPos != null) {
+            Vec3 projected = AeronauticsHelper.sableSubLevelToWorld(this.level, sableMarkedLocalPos);
             cachedMarkedPos = projected;
             cachedTrackedMarkedPos = projected;
             return projected;
@@ -856,10 +858,14 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
                 this.cachedMarkedPos = wp;
                 this.cachedMarkedContraptionId = fc.getMarkedContraptionEntityId();
                 this.cachedMarkedLocalPos = fc.getMarkedLocalPos();
+                this.isSableMarked = fc.isSableMarked();
+                this.sableMarkedLocalPos = fc.getSableMarkedLocalPos();
             } else {
                 this.cachedMarkedPos = null;
                 this.cachedMarkedContraptionId = -1;
                 this.cachedMarkedLocalPos = null;
+                this.isSableMarked = false;
+                this.sableMarkedLocalPos = null;
                 this.cachedTrackedMarkedPos = null;
                 markedPosShotCounter = 0;
             }
@@ -1384,13 +1390,11 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
             }
 
             IGunOperator operator = IGunOperator.fromLivingEntity(fakePlayer);
-            if (operator != null) {
-                ShooterDataHolder holder = operator.getDataHolder();
-                holder.reloadStateType = ReloadState.StateType.NOT_RELOADING;
-                holder.reloadTimestamp = -1L;
-                holder.isBolting = false;
-                holder.boltTimestamp = -1L;
-            }
+            ShooterDataHolder holder = operator.getDataHolder();
+            holder.reloadStateType = ReloadState.StateType.NOT_RELOADING;
+            holder.reloadTimestamp = -1L;
+            holder.isBolting = false;
+            holder.boltTimestamp = -1L;
 
             return true;
         }

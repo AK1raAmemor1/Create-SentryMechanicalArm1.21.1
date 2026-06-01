@@ -12,7 +12,10 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 
-public record SentryMarkPosPacket(BlockPos fcPos, Vec3 worldPos, int contraptionEntityId, BlockPos localPos) implements CustomPacketPayload {
+import java.util.Optional;
+
+public record SentryMarkPosPacket(BlockPos fcPos, Vec3 worldPos, int contraptionEntityId, BlockPos localPos,
+                                  boolean isSableMarked, Optional<Vec3> sableLocalPos) implements CustomPacketPayload {
 
     public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("sentrymechanicalarm", "sentry_mark_pos");
     public static final CustomPacketPayload.Type<SentryMarkPosPacket> TYPE = new CustomPacketPayload.Type<>(ID);
@@ -21,6 +24,8 @@ public record SentryMarkPosPacket(BlockPos fcPos, Vec3 worldPos, int contraption
             ByteBufCodecs.fromCodec(Vec3.CODEC), SentryMarkPosPacket::worldPos,
             ByteBufCodecs.VAR_INT, SentryMarkPosPacket::contraptionEntityId,
             BlockPos.STREAM_CODEC, SentryMarkPosPacket::localPos,
+            ByteBufCodecs.BOOL, SentryMarkPosPacket::isSableMarked,
+            ByteBufCodecs.optional(ByteBufCodecs.fromCodec(Vec3.CODEC)), SentryMarkPosPacket::sableLocalPos,
             SentryMarkPosPacket::new
     );
 
@@ -35,7 +40,8 @@ public record SentryMarkPosPacket(BlockPos fcPos, Vec3 worldPos, int contraption
         if (!level.isLoaded(pos)) return;
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof BlazeFireControlBlockEntity fc) {
-            fc.setMarkedPos(packet.worldPos(), packet.contraptionEntityId(), packet.localPos());
+            fc.setMarkedPos(packet.worldPos(), packet.contraptionEntityId(), packet.localPos(),
+                    packet.isSableMarked(), packet.sableLocalPos().orElse(null));
         }
     }
 }
