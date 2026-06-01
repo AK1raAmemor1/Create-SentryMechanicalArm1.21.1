@@ -229,27 +229,6 @@ public class DynamicRecipeManager {
 
     private record RawStep(Item item, int count) {}
 
-    private record ScaledResult(List<RawStep> steps, int outputCount) {}
-
-    private static ScaledResult scaleToFitSteps(List<RawStep> rawSteps, int maxSteps, int outputCount) {
-        int totalSteps = 0;
-        for (RawStep s : rawSteps) totalSteps += s.count();
-        boolean hasGunpowder = rawSteps.stream().anyMatch(s -> 
-            s.item() == Items.GUNPOWDER || s.item() == Items.TNT);
-        if (!hasGunpowder) totalSteps++;
-
-        if (totalSteps <= maxSteps) return new ScaledResult(rawSteps, outputCount);
-
-        int factor = (int) Math.ceil((double) totalSteps / maxSteps);
-        List<RawStep> scaled = new ArrayList<>();
-        for (RawStep s : rawSteps) {
-            int newCount = Math.max(1, s.count() / factor);
-            scaled.add(new RawStep(s.item(), newCount));
-        }
-        int newOutput = Math.max(1, outputCount / factor);
-        return new ScaledResult(scaled, newOutput);
-    }
-
     private static AmmoRecipeConfig.Config buildConfigFromRecipe(ResourceLocation ammoId, GunSmithTableRecipe recipe) {
         try {
             List<RawStep> rawSteps = new ArrayList<>();
@@ -294,7 +273,6 @@ public class DynamicRecipeManager {
             }
 
             rawSteps = optimizeToBlocks(rawSteps);
-            rawSteps = enforceMaxSteps(rawSteps, 7);
             var scaled = scaleToFitSteps(rawSteps, 7, outputCount);
             rawSteps = scaled.steps();
             outputCount = scaled.outputCount();
@@ -347,65 +325,25 @@ public class DynamicRecipeManager {
         return rawItem;
     }
 
-    private static List<RawStep> enforceMaxSteps(List<RawStep> rawSteps, int maxSteps) {
+    private record ScaledResult(List<RawStep> steps, int outputCount) {}
+
+    private static ScaledResult scaleToFitSteps(List<RawStep> rawSteps, int maxSteps, int outputCount) {
         int totalSteps = 0;
         for (RawStep s : rawSteps) totalSteps += s.count();
-        boolean hasGunpowder = rawSteps.stream().anyMatch(s -> 
+        boolean hasGunpowder = rawSteps.stream().anyMatch(s ->
             s.item() == Items.GUNPOWDER || s.item() == Items.TNT);
         if (!hasGunpowder) totalSteps++;
 
-        if (totalSteps <= maxSteps) return rawSteps;
+        if (totalSteps <= maxSteps) return new ScaledResult(rawSteps, outputCount);
 
-        List<RawStep> result = new ArrayList<>();
-        for (RawStep step : rawSteps) {
-            Item item = step.item();
-            int count = step.count();
-
-            if (item == Items.GUNPOWDER && count >= 2) {
-                result.add(new RawStep(Items.TNT, 1));
-            } else if (item == Items.GLOWSTONE_DUST && count >= 2) {
-                result.add(new RawStep(Items.GLOWSTONE, 1));
-            } else if (item == Items.SNOWBALL && count >= 2) {
-                result.add(new RawStep(Items.SNOW_BLOCK, 1));
-            } else if (item == Items.CLAY_BALL && count >= 2) {
-                result.add(new RawStep(Items.CLAY, 1));
-            } else if (item == Items.BRICK && count >= 2) {
-                result.add(new RawStep(Items.BRICKS, 1));
-            } else if (item == Items.NETHER_BRICK && count >= 2) {
-                result.add(new RawStep(Items.NETHER_BRICKS, 1));
-            } else if (item == Items.AMETHYST_SHARD && count >= 2) {
-                result.add(new RawStep(Items.AMETHYST_BLOCK, 1));
-            } else if (item == Items.QUARTZ && count >= 2) {
-                result.add(new RawStep(Items.QUARTZ_BLOCK, 1));
-            } else if (item == Items.HONEYCOMB && count >= 2) {
-                result.add(new RawStep(Items.HONEYCOMB_BLOCK, 1));
-            } else if (item == Items.BONE_MEAL && count >= 2) {
-                result.add(new RawStep(Items.BONE_BLOCK, 1));
-            } else if (item == Items.LAPIS_LAZULI && count >= 2) {
-                result.add(new RawStep(Items.LAPIS_BLOCK, 1));
-            } else if (item == Items.REDSTONE && count >= 2) {
-                result.add(new RawStep(Items.REDSTONE_BLOCK, 1));
-            } else if (item == Items.DIAMOND && count >= 2) {
-                result.add(new RawStep(Items.DIAMOND_BLOCK, 1));
-            } else if (item == Items.EMERALD && count >= 2) {
-                result.add(new RawStep(Items.EMERALD_BLOCK, 1));
-            } else if (item == Items.COPPER_INGOT && count >= 2) {
-                result.add(new RawStep(Items.COPPER_BLOCK, 1));
-            } else if (item == Items.IRON_INGOT && count >= 2) {
-                result.add(new RawStep(Items.IRON_BLOCK, 1));
-            } else if (item == Items.GOLD_INGOT && count >= 2) {
-                result.add(new RawStep(Items.GOLD_BLOCK, 1));
-            } else if (item == AllItems.COPPER_SHEET.get() && count >= 2) {
-                result.add(new RawStep(Items.COPPER_BLOCK, 1));
-            } else if (item == AllItems.IRON_SHEET.get() && count >= 2) {
-                result.add(new RawStep(Items.IRON_BLOCK, 1));
-            } else if (item == AllItems.GOLDEN_SHEET.get() && count >= 2) {
-                result.add(new RawStep(Items.GOLD_BLOCK, 1));
-            } else {
-                result.add(step);
-            }
+        int factor = (int) Math.ceil((double) totalSteps / maxSteps);
+        List<RawStep> scaled = new ArrayList<>();
+        for (RawStep s : rawSteps) {
+            int newCount = Math.max(1, s.count() / factor);
+            scaled.add(new RawStep(s.item(), newCount));
         }
-        return result;
+        int newOutput = Math.max(1, outputCount / factor);
+        return new ScaledResult(scaled, newOutput);
     }
 
     private static List<RawStep> optimizeToBlocks(List<RawStep> rawSteps) {
