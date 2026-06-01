@@ -229,6 +229,27 @@ public class DynamicRecipeManager {
 
     private record RawStep(Item item, int count) {}
 
+    private record ScaledResult(List<RawStep> steps, int outputCount) {}
+
+    private static ScaledResult scaleToFitSteps(List<RawStep> rawSteps, int maxSteps, int outputCount) {
+        int totalSteps = 0;
+        for (RawStep s : rawSteps) totalSteps += s.count();
+        boolean hasGunpowder = rawSteps.stream().anyMatch(s -> 
+            s.item() == Items.GUNPOWDER || s.item() == Items.TNT);
+        if (!hasGunpowder) totalSteps++;
+
+        if (totalSteps <= maxSteps) return new ScaledResult(rawSteps, outputCount);
+
+        int factor = (int) Math.ceil((double) totalSteps / maxSteps);
+        List<RawStep> scaled = new ArrayList<>();
+        for (RawStep s : rawSteps) {
+            int newCount = Math.max(1, s.count() / factor);
+            scaled.add(new RawStep(s.item(), newCount));
+        }
+        int newOutput = Math.max(1, outputCount / factor);
+        return new ScaledResult(scaled, newOutput);
+    }
+
     private static AmmoRecipeConfig.Config buildConfigFromRecipe(ResourceLocation ammoId, GunSmithTableRecipe recipe) {
         try {
             List<RawStep> rawSteps = new ArrayList<>();
@@ -274,6 +295,9 @@ public class DynamicRecipeManager {
 
             rawSteps = optimizeToBlocks(rawSteps);
             rawSteps = enforceMaxSteps(rawSteps, 7);
+            var scaled = scaleToFitSteps(rawSteps, 7, outputCount);
+            rawSteps = scaled.steps();
+            outputCount = scaled.outputCount();
 
             List<Item> assemblySteps = new ArrayList<>();
             for (RawStep s : rawSteps) {
