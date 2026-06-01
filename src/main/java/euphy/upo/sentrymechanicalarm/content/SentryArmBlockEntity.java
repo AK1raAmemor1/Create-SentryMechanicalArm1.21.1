@@ -1017,6 +1017,10 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
             default -> {}
         }
 
+        if (ctx.actuallyFired) {
+            this.wasCharging = false;
+        }
+
         if (fakeHeldItem.getItem() == heldItem.getItem() && ItemNBTHelper.hasTag(fakeHeldItem)) {
             ItemNBTHelper.setTag(heldItem, ItemNBTHelper.getTag(fakeHeldItem).copy());
         }
