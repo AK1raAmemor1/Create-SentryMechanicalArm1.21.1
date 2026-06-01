@@ -57,14 +57,14 @@ public class ClientPacketHandler {
         GunDisplayInstance display = displayOpt.get();
 
         switch (msg.actionType()) {
-            case CHARGE -> ArmSoundHelper.playAnimationSound(gunStack, level, center, "charge", "warmup", "build", "charge_start");
+            case CHARGE -> ArmSoundHelper.playChargeSound(level, center, gunStack, display);
             case BOLT -> SoundPlayManager.playBoltSound(dummyEntity, display);
             case RELOAD_EMPTY -> SoundPlayManager.playReloadSound(dummyEntity, display, true);
             case RELOAD_TACTICAL -> SoundPlayManager.playReloadSound(dummyEntity, display, false);
             case SHOOT -> {
                 sentry.triggerShootEffects();
                 TimelessAPI.getCommonGunIndex(iGun.getGunId(gunStack)).ifPresent(index ->
-                    ArmSoundHelper.playFireEffects(null, level, center, new Vec3(0, 0, 0), 0, gunStack, index.getGunData())
+                    ArmSoundHelper.playFireEffects(level, center, gunStack, index.getGunData())
                 );
 
                 Vec3 direction = msg.realEnd().subtract(msg.realStart()).normalize();
