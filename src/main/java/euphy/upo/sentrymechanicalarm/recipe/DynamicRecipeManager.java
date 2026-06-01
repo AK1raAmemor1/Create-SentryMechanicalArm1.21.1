@@ -274,6 +274,24 @@ public class DynamicRecipeManager {
 
             rawSteps = optimizeToBlocks(rawSteps);
 
+            int totalSteps = 0;
+            for (RawStep s : rawSteps) totalSteps += s.count();
+            if (rawSteps.stream().noneMatch(s -> s.item() == Items.GUNPOWDER || s.item() == Items.TNT)) {
+                totalSteps++;
+            }
+
+            final int MAX_STEPS = 7;
+            if (totalSteps > MAX_STEPS) {
+                int factor = (int) Math.ceil((double) totalSteps / MAX_STEPS);
+                List<RawStep> scaled = new ArrayList<>();
+                for (RawStep s : rawSteps) {
+                    int newCount = Math.max(1, s.count() / factor);
+                    scaled.add(new RawStep(s.item(), newCount));
+                }
+                rawSteps = scaled;
+                outputCount = Math.max(1, outputCount / factor);
+            }
+
             List<Item> assemblySteps = new ArrayList<>();
             for (RawStep s : rawSteps) {
                 for (int i = 0; i < s.count(); i++) {
