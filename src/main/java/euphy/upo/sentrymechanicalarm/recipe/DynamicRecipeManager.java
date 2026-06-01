@@ -273,24 +273,7 @@ public class DynamicRecipeManager {
             }
 
             rawSteps = optimizeToBlocks(rawSteps);
-
-            int totalSteps = 0;
-            for (RawStep s : rawSteps) totalSteps += s.count();
-            if (rawSteps.stream().noneMatch(s -> s.item() == Items.GUNPOWDER || s.item() == Items.TNT)) {
-                totalSteps++;
-            }
-
-            final int MAX_STEPS = 7;
-            if (totalSteps > MAX_STEPS) {
-                int factor = (int) Math.ceil((double) totalSteps / MAX_STEPS);
-                List<RawStep> scaled = new ArrayList<>();
-                for (RawStep s : rawSteps) {
-                    int newCount = Math.max(1, s.count() / factor);
-                    scaled.add(new RawStep(s.item(), newCount));
-                }
-                rawSteps = scaled;
-                outputCount = Math.max(1, outputCount / factor);
-            }
+            rawSteps = enforceMaxSteps(rawSteps, 7);
 
             List<Item> assemblySteps = new ArrayList<>();
             for (RawStep s : rawSteps) {
@@ -340,112 +323,233 @@ public class DynamicRecipeManager {
         return rawItem;
     }
 
+    private static List<RawStep> enforceMaxSteps(List<RawStep> rawSteps, int maxSteps) {
+        int totalSteps = 0;
+        for (RawStep s : rawSteps) totalSteps += s.count();
+        boolean hasGunpowder = rawSteps.stream().anyMatch(s -> 
+            s.item() == Items.GUNPOWDER || s.item() == Items.TNT);
+        if (!hasGunpowder) totalSteps++;
+
+        if (totalSteps <= maxSteps) return rawSteps;
+
+        List<RawStep> result = new ArrayList<>();
+        for (RawStep step : rawSteps) {
+            Item item = step.item();
+            int count = step.count();
+
+            if (item == Items.GUNPOWDER && count >= 2) {
+                result.add(new RawStep(Items.TNT, 1));
+            } else if (item == Items.GLOWSTONE_DUST && count >= 2) {
+                result.add(new RawStep(Items.GLOWSTONE, 1));
+            } else if (item == Items.SNOWBALL && count >= 2) {
+                result.add(new RawStep(Items.SNOW_BLOCK, 1));
+            } else if (item == Items.CLAY_BALL && count >= 2) {
+                result.add(new RawStep(Items.CLAY, 1));
+            } else if (item == Items.BRICK && count >= 2) {
+                result.add(new RawStep(Items.BRICKS, 1));
+            } else if (item == Items.NETHER_BRICK && count >= 2) {
+                result.add(new RawStep(Items.NETHER_BRICKS, 1));
+            } else if (item == Items.AMETHYST_SHARD && count >= 2) {
+                result.add(new RawStep(Items.AMETHYST_BLOCK, 1));
+            } else if (item == Items.QUARTZ && count >= 2) {
+                result.add(new RawStep(Items.QUARTZ_BLOCK, 1));
+            } else if (item == Items.HONEYCOMB && count >= 2) {
+                result.add(new RawStep(Items.HONEYCOMB_BLOCK, 1));
+            } else if (item == Items.BONE_MEAL && count >= 2) {
+                result.add(new RawStep(Items.BONE_BLOCK, 1));
+            } else if (item == Items.LAPIS_LAZULI && count >= 2) {
+                result.add(new RawStep(Items.LAPIS_BLOCK, 1));
+            } else if (item == Items.REDSTONE && count >= 2) {
+                result.add(new RawStep(Items.REDSTONE_BLOCK, 1));
+            } else if (item == Items.DIAMOND && count >= 2) {
+                result.add(new RawStep(Items.DIAMOND_BLOCK, 1));
+            } else if (item == Items.EMERALD && count >= 2) {
+                result.add(new RawStep(Items.EMERALD_BLOCK, 1));
+            } else if (item == Items.COPPER_INGOT && count >= 2) {
+                result.add(new RawStep(Items.COPPER_BLOCK, 1));
+            } else if (item == Items.IRON_INGOT && count >= 2) {
+                result.add(new RawStep(Items.IRON_BLOCK, 1));
+            } else if (item == Items.GOLD_INGOT && count >= 2) {
+                result.add(new RawStep(Items.GOLD_BLOCK, 1));
+            } else if (item == AllItems.COPPER_SHEET.get() && count >= 2) {
+                result.add(new RawStep(Items.COPPER_BLOCK, 1));
+            } else if (item == AllItems.IRON_SHEET.get() && count >= 2) {
+                result.add(new RawStep(Items.IRON_BLOCK, 1));
+            } else if (item == AllItems.GOLDEN_SHEET.get() && count >= 2) {
+                result.add(new RawStep(Items.GOLD_BLOCK, 1));
+            } else {
+                result.add(step);
+            }
+        }
+        return result;
+    }
+
     private static List<RawStep> optimizeToBlocks(List<RawStep> rawSteps) {
         List<RawStep> result = new ArrayList<>();
         for (RawStep step : rawSteps) {
             Item item = step.item();
             int count = step.count();
 
-            if (item == Items.GUNPOWDER && count >= 4) {
-                int blockCount = count / 4;
-                int remainder = count % 4;
-                if (blockCount > 0) result.add(new RawStep(Items.TNT, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.GUNPOWDER, remainder));
-            } else if (item == Items.GLOWSTONE_DUST && count >= 4) {
-                int blockCount = count / 4;
-                int remainder = count % 4;
-                if (blockCount > 0) result.add(new RawStep(Items.GLOWSTONE, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.GLOWSTONE_DUST, remainder));
-            } else if (item == Items.SNOWBALL && count >= 4) {
-                int blockCount = count / 4;
-                int remainder = count % 4;
-                if (blockCount > 0) result.add(new RawStep(Items.SNOW_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.SNOWBALL, remainder));
-            } else if (item == Items.CLAY_BALL && count >= 4) {
-                int blockCount = count / 4;
-                int remainder = count % 4;
-                if (blockCount > 0) result.add(new RawStep(Items.CLAY, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.CLAY_BALL, remainder));
-            } else if (item == Items.BRICK && count >= 4) {
-                int blockCount = count / 4;
-                int remainder = count % 4;
-                if (blockCount > 0) result.add(new RawStep(Items.BRICKS, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.BRICK, remainder));
-            } else if (item == Items.NETHER_BRICK && count >= 4) {
-                int blockCount = count / 4;
-                int remainder = count % 4;
-                if (blockCount > 0) result.add(new RawStep(Items.NETHER_BRICKS, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.NETHER_BRICK, remainder));
-            } else if (item == Items.AMETHYST_SHARD && count >= 4) {
-                int blockCount = count / 4;
-                int remainder = count % 4;
-                if (blockCount > 0) result.add(new RawStep(Items.AMETHYST_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.AMETHYST_SHARD, remainder));
-            } else if (item == Items.QUARTZ && count >= 4) {
-                int blockCount = count / 4;
-                int remainder = count % 4;
-                if (blockCount > 0) result.add(new RawStep(Items.QUARTZ_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.QUARTZ, remainder));
-            } else if (item == Items.BONE_MEAL && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.BONE_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.BONE_MEAL, remainder));
-            } else if (item == Items.HONEYCOMB && count >= 4) {
-                int blockCount = count / 4;
-                int remainder = count % 4;
-                if (blockCount > 0) result.add(new RawStep(Items.HONEYCOMB_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.HONEYCOMB, remainder));
-            } else if (item == Items.LAPIS_LAZULI && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.LAPIS_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.LAPIS_LAZULI, remainder));
-            } else if (item == Items.REDSTONE && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.REDSTONE_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.REDSTONE, remainder));
-            } else if (item == Items.DIAMOND && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.DIAMOND_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.DIAMOND, remainder));
-            } else if (item == Items.EMERALD && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.EMERALD_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.EMERALD, remainder));
-            } else if (item == Items.COPPER_INGOT && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.COPPER_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.COPPER_INGOT, remainder));
-            } else if (item == Items.IRON_INGOT && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.IRON_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.IRON_INGOT, remainder));
-            } else if (item == Items.GOLD_INGOT && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.GOLD_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(Items.GOLD_INGOT, remainder));
-            } else if (item == AllItems.COPPER_SHEET.get() && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.COPPER_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(AllItems.COPPER_SHEET.get(), remainder));
-            } else if (item == AllItems.IRON_SHEET.get() && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.IRON_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(AllItems.IRON_SHEET.get(), remainder));
-            } else if (item == AllItems.GOLDEN_SHEET.get() && count >= 9) {
-                int blockCount = count / 9;
-                int remainder = count % 9;
-                if (blockCount > 0) result.add(new RawStep(Items.GOLD_BLOCK, blockCount));
-                if (remainder > 0) result.add(new RawStep(AllItems.GOLDEN_SHEET.get(), remainder));
+            if (item == Items.GUNPOWDER) {
+                if (count >= 4) {
+                    result.add(new RawStep(Items.TNT, count / 4));
+                    int remainder = count % 4;
+                    if (remainder > 0) result.add(new RawStep(Items.GUNPOWDER, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.GLOWSTONE_DUST) {
+                if (count >= 4) {
+                    result.add(new RawStep(Items.GLOWSTONE, count / 4));
+                    int remainder = count % 4;
+                    if (remainder > 0) result.add(new RawStep(Items.GLOWSTONE_DUST, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.SNOWBALL) {
+                if (count >= 4) {
+                    result.add(new RawStep(Items.SNOW_BLOCK, count / 4));
+                    int remainder = count % 4;
+                    if (remainder > 0) result.add(new RawStep(Items.SNOWBALL, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.CLAY_BALL) {
+                if (count >= 4) {
+                    result.add(new RawStep(Items.CLAY, count / 4));
+                    int remainder = count % 4;
+                    if (remainder > 0) result.add(new RawStep(Items.CLAY_BALL, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.BRICK) {
+                if (count >= 4) {
+                    result.add(new RawStep(Items.BRICKS, count / 4));
+                    int remainder = count % 4;
+                    if (remainder > 0) result.add(new RawStep(Items.BRICK, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.NETHER_BRICK) {
+                if (count >= 4) {
+                    result.add(new RawStep(Items.NETHER_BRICKS, count / 4));
+                    int remainder = count % 4;
+                    if (remainder > 0) result.add(new RawStep(Items.NETHER_BRICK, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.AMETHYST_SHARD) {
+                if (count >= 4) {
+                    result.add(new RawStep(Items.AMETHYST_BLOCK, count / 4));
+                    int remainder = count % 4;
+                    if (remainder > 0) result.add(new RawStep(Items.AMETHYST_SHARD, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.QUARTZ) {
+                if (count >= 4) {
+                    result.add(new RawStep(Items.QUARTZ_BLOCK, count / 4));
+                    int remainder = count % 4;
+                    if (remainder > 0) result.add(new RawStep(Items.QUARTZ, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.HONEYCOMB) {
+                if (count >= 4) {
+                    result.add(new RawStep(Items.HONEYCOMB_BLOCK, count / 4));
+                    int remainder = count % 4;
+                    if (remainder > 0) result.add(new RawStep(Items.HONEYCOMB, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.BONE_MEAL) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.BONE_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(Items.BONE_MEAL, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.LAPIS_LAZULI) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.LAPIS_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(Items.LAPIS_LAZULI, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.REDSTONE) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.REDSTONE_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(Items.REDSTONE, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.DIAMOND) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.DIAMOND_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(Items.DIAMOND, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.EMERALD) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.EMERALD_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(Items.EMERALD, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.COPPER_INGOT) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.COPPER_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(Items.COPPER_INGOT, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.IRON_INGOT) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.IRON_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(Items.IRON_INGOT, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == Items.GOLD_INGOT) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.GOLD_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(Items.GOLD_INGOT, remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == AllItems.COPPER_SHEET.get()) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.COPPER_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(AllItems.COPPER_SHEET.get(), remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == AllItems.IRON_SHEET.get()) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.IRON_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(AllItems.IRON_SHEET.get(), remainder));
+                } else {
+                    result.add(step);
+                }
+            } else if (item == AllItems.GOLDEN_SHEET.get()) {
+                if (count >= 9) {
+                    result.add(new RawStep(Items.GOLD_BLOCK, count / 9));
+                    int remainder = count % 9;
+                    if (remainder > 0) result.add(new RawStep(AllItems.GOLDEN_SHEET.get(), remainder));
+                } else {
+                    result.add(step);
+                }
             } else {
                 result.add(step);
             }
