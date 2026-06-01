@@ -5,13 +5,10 @@ import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.api.item.attachment.AttachmentType;
 import com.tacz.guns.client.resource.GunDisplayInstance;
 import com.tacz.guns.client.sound.SoundPlayManager;
-import com.tacz.guns.resource.pojo.data.gun.BulletData;
 import com.tacz.guns.resource.pojo.data.gun.GunData;
-import com.tacz.guns.sound.SoundManager;
 import euphy.upo.sentrymechanicalarm.content.SentryArmBlockEntity;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.projectile.Snowball;
+import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -108,40 +105,14 @@ public class ArmSoundHelper {
         if (displayOpt.isPresent()) {
             GunDisplayInstance display = displayOpt.get();
 
-            boolean isSilenced = isSilenced(stack);
-            String soundKey = isSilenced(stack) ? SoundManager.SILENCE_SOUND : SoundManager.SHOOT_SOUND;
-            ResourceLocation soundId = display.getSounds(soundKey);
+            ArmorStand dummyEntity = new ArmorStand(level, pos.x, pos.y, pos.z);
+            dummyEntity.setPos(pos.x, pos.y, pos.z);
+            dummyEntity.setInvisible(true);
 
-            if (soundId == null && soundKey.equals(SoundManager.SILENCE_SOUND)) {
-                soundId = display.getSounds(SoundManager.SHOOT_SOUND);
-            }
-
-            if (soundId != null) {
-                float volume = 3.0f;
-                if(isSilenced) volume =0.25f;
-
-                if (gunData.getFireSound() != null) {
-                    volume *= gunData.getFireSound().getFireMultiplier();
-                }
-                float pitch = 1.0f + (level.random.nextFloat() - 0.5f) * 0.1f;
-                int distance = 32;
-
-                Entity dummyEntity = new Snowball(level, pos.x, pos.y, pos.z);
-                dummyEntity.setPos(pos.x, pos.y, pos.z);
-                SoundPlayManager.playClientSound(dummyEntity, soundId, volume, pitch, distance);
-            }
-        }
-
-        BulletData bulletData = gunData.getBulletData();
-        if (bulletData != null && bulletData.hasTracerAmmo()) {
-            int rpm = gunData.getRoundsPerMinute();
-            float rps = rpm / 60.0f;
-            if (rps <= 0) rps = 1;
-            float chance = 30.0f / rps;
-
-            if (level.random.nextFloat() < chance) {
-                Vec3 startPos = pos.add(0, 1.8, 0).add(direction.scale(0.5));
-
+            if (isSilenced(stack)) {
+                SoundPlayManager.playSilenceSound(dummyEntity, display, gunData);
+            } else {
+                SoundPlayManager.playShootSound(dummyEntity, display, gunData);
             }
         }
     }
