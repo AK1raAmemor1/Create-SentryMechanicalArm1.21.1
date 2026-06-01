@@ -227,10 +227,10 @@ public class DynamicRecipeManager {
         return null;
     }
 
+    private record RawStep(Item item, int count) {}
+
     private static AmmoRecipeConfig.Config buildConfigFromRecipe(ResourceLocation ammoId, GunSmithTableRecipe recipe) {
         try {
-            record RawStep(Item item, int count) {}
-
             List<RawStep> rawSteps = new ArrayList<>();
             for (GunSmithTableIngredient input : recipe.getInputs()) {
                 Ingredient ingredient = input.getIngredient();
@@ -272,6 +272,8 @@ public class DynamicRecipeManager {
                 }
             }
 
+            rawSteps = optimizeToBlocks(rawSteps);
+
             List<Item> assemblySteps = new ArrayList<>();
             for (RawStep s : rawSteps) {
                 for (int i = 0; i < s.count(); i++) {
@@ -281,7 +283,7 @@ public class DynamicRecipeManager {
 
             List<Item> gunpowderSteps = new ArrayList<>();
             assemblySteps.removeIf(item -> {
-                if (item == Items.GUNPOWDER) {
+                if (item == Items.GUNPOWDER || item == Items.TNT) {
                     gunpowderSteps.add(item);
                     return true;
                 }
@@ -289,7 +291,7 @@ public class DynamicRecipeManager {
             });
             assemblySteps.addAll(gunpowderSteps);
 
-            if (assemblySteps.stream().noneMatch(item -> item == Items.GUNPOWDER)) {
+            if (assemblySteps.stream().noneMatch(item -> item == Items.GUNPOWDER || item == Items.TNT)) {
                 assemblySteps.add(Items.GUNPOWDER);
             }
 
@@ -318,6 +320,55 @@ public class DynamicRecipeManager {
         if (rawItem == AllItems.IRON_SHEET.get()) return AllItems.IRON_SHEET.get();
         if (rawItem == AllItems.GOLDEN_SHEET.get()) return AllItems.GOLDEN_SHEET.get();
         return rawItem;
+    }
+
+    private static List<RawStep> optimizeToBlocks(List<RawStep> rawSteps) {
+        List<RawStep> result = new ArrayList<>();
+        for (RawStep step : rawSteps) {
+            Item item = step.item();
+            int count = step.count();
+
+            if (item == Items.GUNPOWDER && count >= 4) {
+                int tntCount = count / 4;
+                int remainder = count % 4;
+                if (tntCount > 0) {
+                    result.add(new RawStep(Items.TNT, tntCount));
+                }
+                if (remainder > 0) {
+                    result.add(new RawStep(Items.GUNPOWDER, remainder));
+                }
+            } else if (item == AllItems.COPPER_SHEET.get() && count >= 9) {
+                int blockCount = count / 9;
+                int remainder = count % 9;
+                if (blockCount > 0) {
+                    result.add(new RawStep(Items.COPPER_BLOCK, blockCount));
+                }
+                if (remainder > 0) {
+                    result.add(new RawStep(AllItems.COPPER_SHEET.get(), remainder));
+                }
+            } else if (item == AllItems.IRON_SHEET.get() && count >= 9) {
+                int blockCount = count / 9;
+                int remainder = count % 9;
+                if (blockCount > 0) {
+                    result.add(new RawStep(Items.IRON_BLOCK, blockCount));
+                }
+                if (remainder > 0) {
+                    result.add(new RawStep(AllItems.IRON_SHEET.get(), remainder));
+                }
+            } else if (item == AllItems.GOLDEN_SHEET.get() && count >= 9) {
+                int blockCount = count / 9;
+                int remainder = count % 9;
+                if (blockCount > 0) {
+                    result.add(new RawStep(Items.GOLD_BLOCK, blockCount));
+                }
+                if (remainder > 0) {
+                    result.add(new RawStep(AllItems.GOLDEN_SHEET.get(), remainder));
+                }
+            } else {
+                result.add(step);
+            }
+        }
+        return result;
     }
 
     private static void injectRecipes(RecipeManager recipeManager, List<RecipeHolder<?>> newRecipes) {
