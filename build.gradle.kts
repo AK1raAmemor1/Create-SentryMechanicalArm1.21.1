@@ -109,6 +109,9 @@ dependencies {
     compileOnly(libs.jei.api)
     runtimeOnly(libs.jei.runtime)
 
+    // EMI - recipe viewer
+    compileOnly(libs.emi)
+
     // LuaJ - for script support
     implementation("org.luaj:luaj-jse:3.0.1")
 
