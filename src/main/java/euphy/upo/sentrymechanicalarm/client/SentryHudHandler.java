@@ -53,6 +53,21 @@ public class SentryHudHandler {
     private static final Component NO_AMMO_TEXT = Component.translatable("message.sentrymechanicalarm.no_ammo")
             .withStyle(ChatFormatting.RED);
 
+    private static int hudFrame = 0;
+    private static final int HUD_REFRESH = 5;
+
+    private static int noAmmoFrame = 0;
+    private static boolean cachedNoAmmo = false;
+
+    private static int entityFrame = 0;
+    private static Entity cachedEntity = null;
+
+    private static int contraptionFrame = 0;
+    private static boolean cachedCHasClipboard = false;
+    private static boolean cachedCIsWhitelist = false;
+    private static List<String> cachedCTargetList = null;
+    private static int cachedCFocusedId = -1;
+
     private static final ResourceLocation SCOPE_OVERLAY = ResourceLocation.fromNamespaceAndPath(
             SentryMechanicalArm.MODID, "textures/misc/blaze_fire_control_scope_overlay.png");
 
@@ -70,6 +85,13 @@ public class SentryHudHandler {
     private static void renderOverlay(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.options.hideGui || mc.player == null) return;
+
+        hudFrame++;
+        if (hudFrame % HUD_REFRESH == 0) {
+            cachedEntity = null;
+            cachedNoAmmo = false;
+            noAmmoFrame = -1;
+        }
 
         var player = mc.player;
 
@@ -94,14 +116,21 @@ public class SentryHudHandler {
         boolean isOffhandClipboard = player.getOffhandItem().getItem() instanceof FireControlClipboardItem;
 
         if (isHoldingSpyglass && isUsingSpyglass && isOffhandClipboard) {
-            Entity target = SentryClientInputHandler.getLookedAtEntity(player, 256.0);
-            if (target != null) {
+            if (entityFrame != hudFrame / HUD_REFRESH) {
+                entityFrame = hudFrame / HUD_REFRESH;
+                cachedEntity = SentryClientInputHandler.getLookedAtEntity(player, 256.0);
+            }
+            if (cachedEntity != null) {
                 renderPrompt(guiGraphics, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(), MARK_TEXT, 15);
             }
             return;
         }
 
-        if (SentryClientInputHandler.isPlayerLookingAtNoAmmoSentry(player, 32.0)) {
+        if (noAmmoFrame != hudFrame / HUD_REFRESH) {
+            noAmmoFrame = hudFrame / HUD_REFRESH;
+            cachedNoAmmo = SentryClientInputHandler.isPlayerLookingAtNoAmmoSentry(player, 32.0);
+        }
+        if (cachedNoAmmo) {
             renderPrompt(guiGraphics, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(), NO_AMMO_TEXT, 5);
         }
 
@@ -115,8 +144,11 @@ public class SentryHudHandler {
             }
             renderPrompt(guiGraphics, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(), BOUND_TEXT, 15);
             if (isUsingScope) {
-                Entity target = SentryClientInputHandler.getLookedAtEntity(player, 256.0);
-                if (target != null) {
+                if (entityFrame != hudFrame / HUD_REFRESH) {
+                    entityFrame = hudFrame / HUD_REFRESH;
+                    cachedEntity = SentryClientInputHandler.getLookedAtEntity(player, 256.0);
+                }
+                if (cachedEntity != null) {
                     renderPrompt(guiGraphics, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight(), FOCUS_TEXT, 25);
                 }
 
@@ -184,28 +216,39 @@ public class SentryHudHandler {
         }
 
         if (!hasClipboard) {
-            net.minecraft.world.phys.AABB searchBounds = new net.minecraft.world.phys.AABB(fcPos).inflate(2);
-            for (AbstractContraptionEntity ace : level.getEntitiesOfClass(AbstractContraptionEntity.class, searchBounds)) {
-                Contraption contraption = ace.getContraption();
-                if (contraption == null) continue;
-                Vec3 localCenter = ace.toLocalVector(Vec3.atCenterOf(fcPos), 0);
-                BlockPos queryLocalPos = BlockPos.containing(localCenter);
-                for (org.apache.commons.lang3.tuple.MutablePair<?, MovementContext> actor : contraption.getActors()) {
-                    if (!actor.getValue().localPos.equals(queryLocalPos)) continue;
-                    if (actor.getValue().temporaryData instanceof FireControlMovementBehaviour.FireControlData fcData) {
-                        if (!fcData.displayItem.isEmpty()) {
-                            hasClipboard = true;
-                            isWhitelist = fcData.isWhitelist;
-                            targetList = fcData.targetList;
+            if (contraptionFrame != hudFrame / (HUD_REFRESH * 2)) {
+                contraptionFrame = hudFrame / (HUD_REFRESH * 2);
+                cachedCHasClipboard = false;
+                cachedCIsWhitelist = false;
+                cachedCTargetList = null;
+                cachedCFocusedId = -1;
+                net.minecraft.world.phys.AABB searchBounds = new net.minecraft.world.phys.AABB(fcPos).inflate(2);
+                for (AbstractContraptionEntity ace : level.getEntitiesOfClass(AbstractContraptionEntity.class, searchBounds)) {
+                    Contraption contraption = ace.getContraption();
+                    if (contraption == null) continue;
+                    Vec3 localCenter = ace.toLocalVector(Vec3.atCenterOf(fcPos), 0);
+                    BlockPos queryLocalPos = BlockPos.containing(localCenter);
+                    for (org.apache.commons.lang3.tuple.MutablePair<?, MovementContext> actor : contraption.getActors()) {
+                        if (!actor.getValue().localPos.equals(queryLocalPos)) continue;
+                        if (actor.getValue().temporaryData instanceof FireControlMovementBehaviour.FireControlData fcData) {
+                            if (!fcData.displayItem.isEmpty()) {
+                                cachedCHasClipboard = true;
+                                cachedCIsWhitelist = fcData.isWhitelist;
+                                cachedCTargetList = fcData.targetList;
+                            }
+                            if (fcData.focusedEntityId != -1) {
+                                cachedCFocusedId = fcData.focusedEntityId;
+                            }
+                            break;
                         }
-                        if (fcData.focusedEntityId != -1) {
-                            focusedEntityId = fcData.focusedEntityId;
-                        }
-                        break;
                     }
+                    if (cachedCHasClipboard) break;
                 }
-                if (hasClipboard) break;
             }
+            hasClipboard = cachedCHasClipboard;
+            isWhitelist = cachedCIsWhitelist;
+            targetList = cachedCTargetList;
+            if (focusedEntityId == -1) focusedEntityId = cachedCFocusedId;
         }
 
         if (!hasClipboard) {

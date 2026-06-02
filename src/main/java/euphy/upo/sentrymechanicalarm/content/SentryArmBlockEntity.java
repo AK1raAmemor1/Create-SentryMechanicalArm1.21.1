@@ -81,6 +81,7 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
     private int markedPosUpdateTimer = 0;
     private Vec3 cachedTrackedMarkedPos = null;
     private BlockPos connectedFireControlPos = null;
+    private BlockPos projectedFireControlPos = null;
     private float lowerArmRecoilOffset = 0f;
     private BlockPos cachedTargetBlock = null;
     private LivingEntity cachedTarget;
@@ -434,7 +435,7 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
                 }
             } else {
                 if (scanCooldown-- <= 0) {
-                    scanCooldown = 20;
+                    scanCooldown = 4;
                     scanForTarget();
                 }
             }
@@ -927,10 +928,9 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
 
     public void disconnectFireControl() {
         this.connectedFireControlPos = null;
+        this.projectedFireControlPos = null;
         this.cachedTarget = null;
         this.setTargetId(-1);
-
-
         this.setChanged();
         this.syncTargetBlock();
     }
@@ -1842,12 +1842,25 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
 
     public void setConnectedFireControl(BlockPos pos) {
         this.connectedFireControlPos = pos;
+        if (level != null && !level.isClientSide && AeronauticsHelper.isInSableSubLevel(level, pos)) {
+            Vec3 projected = AeronauticsHelper.sableSubLevelToWorld(level, Vec3.atCenterOf(pos));
+            this.projectedFireControlPos = BlockPos.containing(projected);
+        } else {
+            this.projectedFireControlPos = pos;
+        }
         this.setChanged();
         this.syncTargetBlock();
+        if (level != null && !level.isClientSide && level.getBlockEntity(pos) instanceof BlazeFireControlBlockEntity fc) {
+            fc.notifyConnectedSentries(false);
+        }
     }
 
     public BlockPos getConnectedFireControl() {
         return connectedFireControlPos;
+    }
+
+    public BlockPos getProjectedFireControlPos() {
+        return projectedFireControlPos != null ? projectedFireControlPos : connectedFireControlPos;
     }
 
     public boolean isCeiling() {
@@ -1938,6 +1951,11 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
         }
         if (compound.contains("FireControlPos")) {
             this.connectedFireControlPos = NbtUtils.readBlockPos(compound, "FireControlPos").orElse(null);
+            if (this.connectedFireControlPos != null && compound.contains("ProjFCX")) {
+                this.projectedFireControlPos = new BlockPos(compound.getInt("ProjFCX"), compound.getInt("ProjFCY"), compound.getInt("ProjFCZ"));
+            } else {
+                this.projectedFireControlPos = this.connectedFireControlPos;
+            }
         } else {
             this.connectedFireControlPos = null;
         }
@@ -1984,6 +2002,11 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
         compound.putInt("IdleScanTimer", idleScanTimer);
         if (this.connectedFireControlPos != null) {
             compound.put("FireControlPos", NbtUtils.writeBlockPos(this.connectedFireControlPos));
+        }
+        if (this.projectedFireControlPos != null) {
+            compound.putInt("ProjFCX", this.projectedFireControlPos.getX());
+            compound.putInt("ProjFCY", this.projectedFireControlPos.getY());
+            compound.putInt("ProjFCZ", this.projectedFireControlPos.getZ());
         }
         if (this.cachedTargetBlock != null) {
             compound.put("TargetBlock", NbtUtils.writeBlockPos(this.cachedTargetBlock));

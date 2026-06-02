@@ -22,6 +22,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import euphy.upo.sentrymechanicalarm.compat.AeronauticsHelper;
 import euphy.upo.sentrymechanicalarm.util.ItemNBTHelper;
 import euphy.upo.sentrymechanicalarm.registry.SentryRegistry;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -70,6 +71,8 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
     public static final int FOCUS_DURATION = 600;
     private boolean hasBoundScope = false;
     private int markedEntityId = -1;
+    private long[] sentryPositionData = new long[0];
+    private long[] projectedSentryPositions = new long[0];
 
     public boolean hasBoundScope() { return hasBoundScope; }
     public void setHasBoundScope(boolean val) {
@@ -190,6 +193,8 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
                 compound.putDouble("SableLocalZ", sableMarkedLocalPos.z);
             }
         }
+        compound.putLongArray("SentryPositions", sentryPositionData);
+        compound.putLongArray("ProjSentryPositions", projectedSentryPositions);
     }
 
     @Override
@@ -213,6 +218,16 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
         }
         if (compound.contains("HasBoundScope")) {
             hasBoundScope = compound.getBoolean("HasBoundScope");
+        }
+        if (compound.contains("SentryPositions")) {
+            sentryPositionData = compound.getLongArray("SentryPositions");
+        } else {
+            sentryPositionData = new long[0];
+        }
+        if (compound.contains("ProjSentryPositions")) {
+            projectedSentryPositions = compound.getLongArray("ProjSentryPositions");
+        } else {
+            projectedSentryPositions = new long[0];
         }
         markedEntityId = -1;
         if (compound.contains("MarkedPosX")) {
@@ -255,6 +270,8 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
     public void notifyConnectedSentries(boolean isRemoving) {
         if (level == null) return;
 
+        List<Long> found = new ArrayList<>();
+        List<Long> projected = new ArrayList<>();
         BlockPos.betweenClosedStream(
                 this.worldPosition.offset(-6, -6, -6),
                 this.worldPosition.offset(6, 6, 6)
@@ -267,9 +284,32 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
                     } else {
                         sentry.updateFromFireControl();
                     }
+                    found.add(pos.asLong());
+                    Vec3 worldPos = AeronauticsHelper.sableSubLevelToWorld(level, Vec3.atCenterOf(pos));
+                    projected.add(BlockPos.containing(worldPos).asLong());
                 }
             }
         });
+        this.sentryPositionData = isRemoving ? new long[0] : found.stream().mapToLong(l -> l).toArray();
+        this.projectedSentryPositions = isRemoving ? new long[0] : projected.stream().mapToLong(l -> l).toArray();
+        setChanged();
+        sendData();
+    }
+
+    public List<BlockPos> getSentryPositions() {
+        List<BlockPos> result = new ArrayList<>(sentryPositionData.length);
+        for (long l : sentryPositionData) {
+            result.add(BlockPos.of(l));
+        }
+        return result;
+    }
+
+    public List<BlockPos> getProjectedSentryPositions() {
+        List<BlockPos> result = new ArrayList<>(projectedSentryPositions.length);
+        for (long l : projectedSentryPositions) {
+            result.add(BlockPos.of(l));
+        }
+        return result;
     }
 
     @Override
@@ -283,19 +323,7 @@ public class BlazeFireControlBlockEntity extends SmartBlockEntity implements IHa
                         : "message.sentrymechanicalarm.scope_not_bound")
                         .withStyle(boundColor)));
 
-        int sentryCount = 0;
-        if (level != null) {
-            for (BlockPos bp : BlockPos.betweenClosed(
-                    worldPosition.offset(-6, -6, -6),
-                    worldPosition.offset(6, 6, 6))) {
-                if (level.getBlockEntity(bp) instanceof SentryArmBlockEntity sentry) {
-                    BlockPos connected = sentry.getConnectedFireControl();
-                    if (connected != null && connected.equals(worldPosition)) {
-                        sentryCount++;
-                    }
-                }
-            }
-        }
+        int sentryCount = sentryPositionData.length;
         tooltip.add(Component.literal("    ")
                 .append(Component.translatable("overlay.sentrymechanicalarm.connected_sentries")
                         .withStyle(ChatFormatting.GRAY))

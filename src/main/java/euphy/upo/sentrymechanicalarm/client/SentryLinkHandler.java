@@ -24,12 +24,18 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import org.joml.Vector3f;
 
+import java.util.List;
+
 @EventBusSubscriber(modid = euphy.upo.sentrymechanicalarm.SentryMechanicalArm.MODID, value = Dist.CLIENT)
 public class
 SentryLinkHandler {
 
     private static BlockPos firstSelectedPos = null;
-    private static boolean isFirstSentry = false; 
+    private static boolean isFirstSentry = false;
+
+    private static final DustParticleOptions PARTICLE_GREEN = new DustParticleOptions(new Vector3f(0.0f, 1.0f, 0.0f), 1.0f);
+    private static final DustParticleOptions PARTICLE_RED = new DustParticleOptions(new Vector3f(1.0f, 0.0f, 0.0f), 1.0f);
+    private static final DustParticleOptions PARTICLE_CYAN = new DustParticleOptions(new Vector3f(0.0f, 1.0f, 1.0f), 1.0f);
 
     @SubscribeEvent
     public static void onBlockRightClick(PlayerInteractEvent.RightClickBlock event) {
@@ -39,9 +45,7 @@ SentryLinkHandler {
         Player player = event.getEntity();
         ItemStack heldItem = player.getMainHandItem();
 
- 
         if (!heldItem.getItem().getDescriptionId().contains("wrench")) {
- 
             if (firstSelectedPos != null) firstSelectedPos = null;
             return;
         }
@@ -52,7 +56,7 @@ SentryLinkHandler {
         boolean isFireControl = level.getBlockEntity(pos) instanceof BlazeFireControlBlockEntity;
 
         if (!isSentry && !isFireControl) return;
- 
+
         if (firstSelectedPos == null) {
             firstSelectedPos = pos;
             isFirstSentry = isSentry;
@@ -61,30 +65,26 @@ SentryLinkHandler {
             } else {
                 player.displayClientMessage(Component.translatable("message.sentrymechanicalarm.select_fire_control"), true);
             }
-            event.setCanceled(true); 
+            event.setCanceled(true);
         }
- 
+
         else {
- 
             if (pos.equals(firstSelectedPos)) {
                 firstSelectedPos = null;
                 player.displayClientMessage(Component.translatable("message.sentrymechanicalarm.cancelled"), true);
                 event.setCanceled(true);
                 return;
             }
- 
+
             boolean validPair = (isFirstSentry && isFireControl) || (!isFirstSentry && isSentry);
 
             if (validPair) {
- 
                 PacketDistributor.sendToServer(new SentryLinkPacket(firstSelectedPos, pos));
- 
                 firstSelectedPos = null;
                 event.setCanceled(true);
             } else {
- 
                 player.displayClientMessage(Component.translatable("message.sentrymechanicalarm.invalid_pair"), true);
-                firstSelectedPos = null; 
+                firstSelectedPos = null;
                 event.setCanceled(true);
             }
         }
@@ -97,22 +97,19 @@ SentryLinkHandler {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
- 
         ItemStack heldItem = mc.player.getMainHandItem();
         boolean hasWrench = heldItem.getItem().getDescriptionId().contains("wrench");
         if (!hasWrench) {
- 
             if (firstSelectedPos == null) return;
         }
 
- 
         BlockPos lookPos = null;
         if (mc.hitResult instanceof net.minecraft.world.phys.BlockHitResult blockHit) {
             lookPos = blockHit.getBlockPos();
         } else {
-            return; 
+            return;
         }
- 
+
         if (firstSelectedPos != null) {
             Vec3 start = Vec3.atCenterOf(firstSelectedPos);
             Vec3 end = Vec3.atCenterOf(lookPos);
@@ -120,70 +117,47 @@ SentryLinkHandler {
             double distSqr = start.distanceToSqr(end);
             boolean inRange = distSqr <= 36.0;
 
- 
-            Vector3f color = inRange ? new Vector3f(0.0f, 1.0f, 0.0f) : new Vector3f(1.0f, 0.0f, 0.0f);
-            renderParticleLine(mc.level, start, end, color);
+            DustParticleOptions particle = inRange ? PARTICLE_GREEN : PARTICLE_RED;
+            renderParticleLine(mc.level, start, end, particle);
 
- 
             renderOverlayText(event, mc, lookPos, inRange);
         }
 
         else {
             BlockEntity be = mc.level.getBlockEntity(lookPos);
 
-            Vector3f establishedColor = new Vector3f(0.0f, 1.0f, 1.0f); 
-
- 
             if (be instanceof SentryArmBlockEntity sentry) {
                 BlockPos targetPos = sentry.getConnectedFireControl();
- 
+
                 if (targetPos != null && isValidFireControl(mc.level, targetPos)) {
-                    renderParticleLine(mc.level, Vec3.atCenterOf(lookPos), Vec3.atCenterOf(targetPos), establishedColor);
+                    renderParticleLine(mc.level, Vec3.atCenterOf(lookPos), Vec3.atCenterOf(sentry.getProjectedFireControlPos()), PARTICLE_CYAN);
                 }
             }
- 
-            else if (be instanceof BlazeFireControlBlockEntity) {
-                for (int x = -6; x <= 6; x++) {
-                    for (int y = -6; y <= 6; y++) {
-                        for (int z = -6; z <= 6; z++) {
-                            BlockPos checkPos = lookPos.offset(x, y, z);
- 
-                            if (mc.level.getBlockEntity(checkPos) instanceof SentryArmBlockEntity linkedSentry) {
-                                BlockPos linkedTarget = linkedSentry.getConnectedFireControl();
- 
-                                if (linkedTarget != null && linkedTarget.equals(lookPos)) {
-                                    renderParticleLine(mc.level, Vec3.atCenterOf(lookPos), Vec3.atCenterOf(checkPos), establishedColor);
-                                }
-                            }
-                        }
-                    }
+
+            else if (be instanceof BlazeFireControlBlockEntity fc) {
+                for (BlockPos checkPos : fc.getProjectedSentryPositions()) {
+                    renderParticleLine(mc.level, Vec3.atCenterOf(lookPos), Vec3.atCenterOf(checkPos), PARTICLE_CYAN);
                 }
             }
         }
     }
 
     private static boolean isValidFireControl(Level level, BlockPos pos) {
- 
         if (!level.isLoaded(pos)) return false;
- 
         return level.getBlockEntity(pos) instanceof BlazeFireControlBlockEntity;
     }
 
- 
-    private static void renderParticleLine(Level level, Vec3 start, Vec3 end, Vector3f color) {
+    private static void renderParticleLine(Level level, Vec3 start, Vec3 end, DustParticleOptions particle) {
         double dist = Math.sqrt(start.distanceToSqr(end));
         if (dist < 0.1) return;
+        if (dist > 100) return;
 
-        DustParticleOptions particle = new DustParticleOptions(color, 1.0f);
-        int steps = (int) (dist * 5); 
-
+        int steps = (int) (dist * 5);
         for (int i = 0; i <= steps; i++) {
             double lerp = i / (double) steps;
             double x = start.x + (end.x - start.x) * lerp;
             double y = start.y + (end.y - start.y) * lerp;
             double z = start.z + (end.z - start.z) * lerp;
-
- 
             if (level.random.nextInt(4) == 0) {
                 level.addParticle(particle, x, y, z, 0, 0, 0);
             }
