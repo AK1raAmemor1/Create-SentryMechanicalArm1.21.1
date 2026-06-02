@@ -11,7 +11,7 @@ import org.joml.Quaternionf;
 /**
  * Optional Aeronautics (Valkyrien Skies 2) + Sable integration.
  * VS2 uses reflection (no compile-time dependency).
- * Sable uses SableCompanion API (compile-time safe dependency, bundled via jarJar).
+ * Sable uses SableCompanion API (bundled via jarJar, safe defaults when Sable absent).
  */
 public class AeronauticsHelper {
 
@@ -38,7 +38,7 @@ public class AeronauticsHelper {
         return aeronauticsLoaded != null && aeronauticsLoaded;
     }
 
-    // ---- Sable Companion (compile-time API, safe defaults when Sable is absent) ----
+    // ---- Sable Companion (compile-time API, jarJar'd, safe defaults when Sable absent) ----
 
     /** Check if a block position is inside a Sable sub-level plot. */
     public static boolean isInSableSubLevel(Level level, BlockPos pos) {

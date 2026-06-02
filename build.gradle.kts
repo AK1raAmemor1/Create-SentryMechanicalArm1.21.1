@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "euphy.upo.sentrymechanicalarm"
-version = "1.3.1"
+version = "1.3.2"
 
 base {
     archivesName = "sentrymechanicalarm-neoforge-1.21.1"
@@ -120,6 +120,7 @@ dependencies {
 
     // Sable Companion — multi-loader compatibility library, bundled via jarJar
     implementation("dev.ryanhcode.sable-companion:sable-companion-common-1.21.1:1.6.0")
+    jarJar("dev.ryanhcode.sable-companion:sable-companion-common-1.21.1:1.6.0")
 }
 
 tasks.named<Jar>("jar") {
