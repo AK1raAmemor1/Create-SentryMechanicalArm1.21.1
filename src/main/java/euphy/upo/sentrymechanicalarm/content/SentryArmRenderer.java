@@ -149,8 +149,12 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
                 }
                 ms.pushPose();
                 ms.last().pose().mul(msLocal.last().pose());
-                ItemDisplayContext displayContext = ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
-                Minecraft.getInstance().getItemRenderer().renderStatic(item, displayContext, light, overlay, ms, buffer, be.getLevel(), 0);
+                try {
+                    ItemDisplayContext displayContext = ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
+                    Minecraft.getInstance().getItemRenderer().renderStatic(item, displayContext, light, overlay, ms, buffer, be.getLevel(), 0);
+                } catch (Exception e) {
+                    LOGGER.debug("Failed to render held gun item", e);
+                }
 
                 renderAmmoBoxes(be, ms, buffer, light, overlay);
                 renderMuzzleFlash(be, item, ms, buffer);
@@ -158,11 +162,15 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
                 ms.popPose();
 
             } else {
- 
+  
                 float itemScale = isBlockItem ? 0.5F : 0.625F;
                 msLocal.scale(itemScale, itemScale, itemScale);
                 ms.last().pose().mul(msLocal.last().pose());
-                Minecraft.getInstance().getItemRenderer().renderStatic(item, ItemDisplayContext.FIXED, light, overlay, ms, buffer, be.getLevel(), 0);
+                try {
+                    Minecraft.getInstance().getItemRenderer().renderStatic(item, ItemDisplayContext.FIXED, light, overlay, ms, buffer, be.getLevel(), 0);
+                } catch (Exception e) {
+                    LOGGER.debug("Failed to render held non-gun item", e);
+                }
             }
 
             ms.popPose();
@@ -172,6 +180,7 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
     private void renderCog(SentryArmBlockEntity be, PoseStack ms, MultiBufferSource buffer, int light, Optional<DyeColor> color) {
         BlockState blockState = be.getBlockState();
         SuperByteBuffer cog = CachedBuffers.partial(SentryPartialModels.SENTRU_COG, blockState);
+        if (cog == null) return;
 
         Direction.Axis axis = Direction.Axis.Y;
         float angle = getAngleForBe(be, be.getBlockPos(), axis);
@@ -280,16 +289,20 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
                 ms.translate(-0.35, -0.5, 0.6);
                 ms.mulPose(Axis.YP.rotationDegrees(90));
             }
-            Minecraft.getInstance().getItemRenderer().renderStatic(
-                    box,
-                    ItemDisplayContext.FIXED,
-                    light,
-                    overlay,
-                    ms,
-                    buffer,
-                    be.getLevel(),
-                    0
-            );
+            try {
+                Minecraft.getInstance().getItemRenderer().renderStatic(
+                        box,
+                        ItemDisplayContext.FIXED,
+                        light,
+                        overlay,
+                        ms,
+                        buffer,
+                        be.getLevel(),
+                        0
+                );
+            } catch (Exception e) {
+                LOGGER.debug("Failed to render ammo box", e);
+            }
             ms.popPose();
         }
         ms.popPose();
@@ -362,13 +375,22 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
     }
 
     private void renderArm(VertexConsumer builder, PoseStack ms, PoseStack msLocal, TransformStack msr, BlockState blockState, int color, float baseAngle, float lowerArmAngle, float upperArmAngle, float headAngle, boolean inverted, boolean hasItem, boolean isBlockItem, int light, Optional<DyeColor> dyeColor) {
- 
-        SuperByteBuffer base = CachedBuffers.partial(SentryPartialModels.SENTRU_BASE, blockState).light(light);
-        SuperByteBuffer lowerBody = CachedBuffers.partial(SentryPartialModels.ARM_LOWER_BODY, blockState).light(light);
-        SuperByteBuffer upperBody = CachedBuffers.partial(SentryPartialModels.ARM_UPPER_BODY, blockState).light(light);
-        SuperByteBuffer claw = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_BASE, blockState).light(light);
-        SuperByteBuffer upperClawGrip = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_GRIP_UPPER, blockState).light(light);
-        SuperByteBuffer lowerClawGrip = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_GRIP_LOWER, blockState).light(light);
+  
+        SuperByteBuffer base = CachedBuffers.partial(SentryPartialModels.SENTRU_BASE, blockState);
+        SuperByteBuffer lowerBody = CachedBuffers.partial(SentryPartialModels.ARM_LOWER_BODY, blockState);
+        SuperByteBuffer upperBody = CachedBuffers.partial(SentryPartialModels.ARM_UPPER_BODY, blockState);
+        SuperByteBuffer claw = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_BASE, blockState);
+        SuperByteBuffer upperClawGrip = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_GRIP_UPPER, blockState);
+        SuperByteBuffer lowerClawGrip = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_GRIP_LOWER, blockState);
+
+        if (base == null || lowerBody == null || upperBody == null || claw == null || upperClawGrip == null || lowerClawGrip == null) return;
+
+        base.light(light);
+        lowerBody.light(light);
+        upperBody.light(light);
+        claw.light(light);
+        upperClawGrip.light(light);
+        lowerClawGrip.light(light);
 
         applyDye(base, dyeColor, SentrySpriteShifts.BASE_TEXTURES);
         applyDye(lowerBody, dyeColor, SentrySpriteShifts.ARM_TEXTURES);
@@ -609,30 +631,35 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
             if (inverted) {
                 msr.rotateXDegrees(180.0F);
             }
-            ms.pushPose();
-            transformBase(msr, baseAngle);
             SuperByteBuffer baseBuffer = CachedBuffers.partial(SentryPartialModels.SENTRU_BASE, blockState);
-            applyDye(baseBuffer, virtualBE.color, SentrySpriteShifts.BASE_TEXTURES);
-            baseBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
-            ms.popPose();
+            if (baseBuffer != null) {
+                ms.pushPose();
+                transformBase(msr, baseAngle);
+                applyDye(baseBuffer, virtualBE.color, SentrySpriteShifts.BASE_TEXTURES);
+                baseBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
+                ms.popPose();
+            }
 
-            ms.pushPose();
-            transformBase(msr, baseAngle);
-            transformLowerArm(msr, lowerArmAngle);
             SuperByteBuffer lowerBodyBuffer = CachedBuffers.partial(SentryPartialModels.ARM_LOWER_BODY, blockState);
-            applyDye(lowerBodyBuffer, virtualBE.color, SentrySpriteShifts.ARM_TEXTURES);
-            lowerBodyBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
-
-            transformUpperArm(msr, upperArmAngle);
             SuperByteBuffer upperBodyBuffer = CachedBuffers.partial(SentryPartialModels.ARM_UPPER_BODY, blockState);
-            applyDye(upperBodyBuffer, virtualBE.color, SentrySpriteShifts.ARM_TEXTURES);
-            upperBodyBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
-
-            transformHead(msr, headAngle);
-            if (inverted) msr.rotateZDegrees(180.0F);
             SuperByteBuffer clawBaseBuffer = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_BASE, blockState);
-            applyDye(clawBaseBuffer, virtualBE.color, SentrySpriteShifts.ARM_TEXTURES);
-            clawBaseBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
+            if (lowerBodyBuffer != null && upperBodyBuffer != null && clawBaseBuffer != null) {
+                ms.pushPose();
+                transformBase(msr, baseAngle);
+                transformLowerArm(msr, lowerArmAngle);
+                applyDye(lowerBodyBuffer, virtualBE.color, SentrySpriteShifts.ARM_TEXTURES);
+                lowerBodyBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
+
+                transformUpperArm(msr, upperArmAngle);
+                applyDye(upperBodyBuffer, virtualBE.color, SentrySpriteShifts.ARM_TEXTURES);
+                upperBodyBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
+
+                transformHead(msr, headAngle);
+                if (inverted) msr.rotateZDegrees(180.0F);
+                applyDye(clawBaseBuffer, virtualBE.color, SentrySpriteShifts.ARM_TEXTURES);
+                clawBaseBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
+                ms.popPose();
+            }
 
             org.joml.Matrix4f clawTipWorldMatrix = null;
             for (int flip : net.createmod.catnip.data.Iterate.positiveAndNegative) {
@@ -644,24 +671,28 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
                 }
                 PartialModel gripModel = (flip > 0) ? SentryPartialModels.ARM_CLAW_GRIP_LOWER : SentryPartialModels.ARM_CLAW_GRIP_UPPER;
                 SuperByteBuffer gripBuffer = CachedBuffers.partial(gripModel, blockState);
-                applyDye(gripBuffer, virtualBE.color, SentrySpriteShifts.ARM_TEXTURES);
-                gripBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
+                if (gripBuffer != null) {
+                    applyDye(gripBuffer, virtualBE.color, SentrySpriteShifts.ARM_TEXTURES);
+                    gripBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
+                }
                 ms.popPose();
             }
             ms.popPose();
 
-            ms.pushPose();
-            msr.uncenter();
-            msr.center();
-            float speed = virtualBE.getSpeed();
-            float time = net.createmod.catnip.animation.AnimationTickHolder.getRenderTime();
-            float cogAngle = (time * speed * 3f / 10f) % 360;
-            ms.mulPose(com.mojang.math.Axis.YP.rotationDegrees(cogAngle));
-            msr.uncenter();
             SuperByteBuffer cogBuffer = CachedBuffers.partial(SentryPartialModels.SENTRU_COG, blockState);
-            applyDye(cogBuffer, virtualBE.color, SentrySpriteShifts.COG_TEXTURES);
-            cogBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
-            ms.popPose();
+            if (cogBuffer != null) {
+                ms.pushPose();
+                msr.uncenter();
+                msr.center();
+                float speed = virtualBE.getSpeed();
+                float time = net.createmod.catnip.animation.AnimationTickHolder.getRenderTime();
+                float cogAngle = (time * speed * 3f / 10f) % 360;
+                ms.mulPose(com.mojang.math.Axis.YP.rotationDegrees(cogAngle));
+                msr.uncenter();
+                applyDye(cogBuffer, virtualBE.color, SentrySpriteShifts.COG_TEXTURES);
+                cogBuffer.light(light).transform(ms).renderInto(matrices.getViewProjection(), builder);
+                ms.popPose();
+            }
 
             if (clawTipWorldMatrix != null) {
                 renderHeldItem(buffer, renderWorld, virtualBE, light, clawTipWorldMatrix, context);
@@ -709,7 +740,8 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
             isCeiling = context.state.getValue(SentryArmBlock.CEILING);
         }
 
-        boolean isBlockItem = Minecraft.getInstance().getItemRenderer().getModel(heldItem, renderWorld, null, 0).isGui3d();
+        BakedModel heldItemModel = Minecraft.getInstance().getItemRenderer().getModel(heldItem, renderWorld, null, 0);
+        boolean isBlockItem = heldItemModel != null && heldItemModel.isGui3d();
 
         PoseStack gunStack = new PoseStack();
         gunStack.last().pose().set(clawTipWorldMatrix);

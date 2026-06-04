@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "euphy.upo.sentrymechanicalarm"
-version = "1.3.2"
+version = "1.3.3"
 
 base {
     archivesName = "sentrymechanicalarm-neoforge-1.21.1"

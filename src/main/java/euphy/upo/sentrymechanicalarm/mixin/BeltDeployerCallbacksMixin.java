@@ -14,6 +14,7 @@ import euphy.upo.sentrymechanicalarm.content.UnfinishedAmmoItem;
 import euphy.upo.sentrymechanicalarm.registry.SentryRegistry;
 import euphy.upo.sentrymechanicalarm.util.ItemNBTHelper;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,6 +25,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(BeltDeployerCallbacks.class)
 public class BeltDeployerCallbacksMixin {
+
+    @Unique
+    private static final long FILL_COOLDOWN_TICKS = 60L;
 
     @Inject(method = "onItemReceived", at = @At("RETURN"), cancellable = true, remap = false)
     private static void onItemReceivedReturn(TransportedItemStack transported, TransportedItemStackHandlerBehaviour handler, DeployerBlockEntity deployer, CallbackInfoReturnable<BeltProcessingBehaviour.ProcessingResult> cir) {
@@ -49,19 +53,20 @@ public class BeltDeployerCallbacksMixin {
         ItemStack beltStack = transported.stack;
         if (beltStack.isEmpty()) return false;
 
-        if (beltStack.getItem() != SentryRegistry.UNFINISHED_AMMO.get()) return false;
-        if (beltStack.has(AllDataComponents.SEQUENCED_ASSEMBLY)) return false;
-
         boolean isCopper = handStack.getItem() == AllItems.COPPER_SHEET.get();
         boolean isGunpowder = handStack.getItem() == Items.GUNPOWDER;
 
-        if (isCopper && UnfinishedAmmoItem.getCopperSheets(beltStack) >= UnfinishedAmmoItem.MAX_COPPER_SHEETS) return false;
-        if (isGunpowder && UnfinishedAmmoItem.hasGunpowder(beltStack)) return false;
+        if (beltStack.getItem() == SentryRegistry.UNFINISHED_AMMO.get()) {
+            if (beltStack.has(AllDataComponents.SEQUENCED_ASSEMBLY)) return false;
 
-        if (isCopper || isGunpowder) return true;
+            if (isCopper && UnfinishedAmmoItem.getCopperSheets(beltStack) >= UnfinishedAmmoItem.MAX_COPPER_SHEETS) return false;
+            if (isGunpowder && UnfinishedAmmoItem.hasGunpowder(beltStack)) return false;
 
-        if (IAmmo.getIAmmoOrNull(handStack) != null) {
-            return beltStack.getItem() instanceof IAmmoBox;
+            if (isCopper || isGunpowder) return true;
+        }
+
+        if (IAmmo.getIAmmoOrNull(handStack) != null && beltStack.getItem() instanceof IAmmoBox) {
+            return true;
         }
 
         return false;
@@ -115,6 +120,63 @@ public class BeltDeployerCallbacksMixin {
             return BeltProcessingBehaviour.ProcessingResult.HOLD;
         }
 
+        IAmmo heldAmmo = IAmmo.getIAmmoOrNull(handStack);
+        if (heldAmmo != null && beltStack.getItem() instanceof IAmmoBox) {
+            ItemStack newBoxStack = beltStack.copy();
+            IAmmoBox boxItem = (IAmmoBox) newBoxStack.getItem();
+
+            ResourceLocation boxId = boxItem.getAmmoId(newBoxStack);
+            ResourceLocation bulletId = heldAmmo.getAmmoId(handStack);
+            boolean isBoxEmpty = boxId == null || boxId.toString().equals("tacz:empty");
+
+            if (!isBoxEmpty && !boxId.equals(bulletId)) {
+                return BeltProcessingBehaviour.ProcessingResult.PASS;
+            }
+
+            int maxCapacity = getMaxAmmoCount(boxItem, newBoxStack);
+            int currentCount = boxItem.getAmmoCount(newBoxStack);
+
+            if (currentCount >= maxCapacity) {
+                return BeltProcessingBehaviour.ProcessingResult.PASS;
+            }
+
+            if (isBoxEmpty) {
+                boxItem.setAmmoId(newBoxStack, bulletId);
+            }
+
+            int space = maxCapacity - currentCount;
+            int toAdd = Math.min(space, handStack.getCount());
+
+            boxItem.setAmmoCount(newBoxStack, currentCount + toAdd);
+
+            CompoundTag tag = ItemNBTHelper.getOrCreateTag(newBoxStack);
+            if (gameTime - tag.getLong("SMAPCooldown") < FILL_COOLDOWN_TICKS) {
+                return BeltProcessingBehaviour.ProcessingResult.HOLD;
+            }
+            tag.putLong("SMAPCooldown", gameTime);
+            ItemNBTHelper.setTag(newBoxStack, tag);
+
+            handStack.shrink(toAdd);
+
+            TransportedItemStack newTransported = transported.copy();
+            newTransported.stack = newBoxStack.copy();
+            handler.handleProcessingOnItem(transported, TransportedResult.convertTo(newTransported));
+
+            return BeltProcessingBehaviour.ProcessingResult.HOLD;
+        }
+
         return BeltProcessingBehaviour.ProcessingResult.PASS;
+    }
+
+    @Unique
+    private static int getMaxAmmoCount(IAmmoBox box, ItemStack stack) {
+        if (box.isCreative(stack)) return Integer.MAX_VALUE;
+        int level = box.getAmmoLevel(stack);
+        return switch (level) {
+            case 0 -> 180;
+            case 1 -> 360;
+            case 2 -> 540;
+            default -> 180;
+        };
     }
 }
