@@ -873,8 +873,8 @@ public class SentryMovementBehaviour implements MovementBehaviour {
                                        Vec3 globalPos, Vec3 muzzlePos, Entity shooter) {
         if (AeronauticsHelper.isAeronauticsLoaded() && context.world != null) {
             Vec3 localPosCenter = VecHelper.getCenterOf(context.localPos);
-            double yOffset = isCeiling(context) ? -2.0 : 2.0;
-            Vec3 localMuzzlePos = localPosCenter.add(0, yOffset, 0);
+            ItemStack gunForMuzzle = virtualBE.getHeldItem();
+            Vec3 localMuzzlePos = SentryFakePlayer.getContraptionLocalMuzzle(localPosCenter, virtualBE, gunForMuzzle);
             Vec3 correctedGlobal = AeronauticsHelper.localToSimulatedWorld(context.world, localPosCenter, globalPos);
             Vec3 correctedMuzzle = AeronauticsHelper.localToSimulatedWorld(context.world, localMuzzlePos, muzzlePos);
             if (correctedGlobal.distanceToSqr(globalPos) > 0.01) {
