@@ -19,3 +19,11 @@ src/generated/resources/
 /CODE_REVIEW_ArmSoundHelper.md
 /RENDERING_NPE_FIX.md
 /BULLET_ALIGNMENT_FIX.md
+
+# MixinMCP auto-injected rules
+.cursor/rules/minecraft-mod-project.mdc
+.cursor/skills/mixin-writing/SKILL.md
+.cursor/skills/mixin-writing/references/at-reference.md
+.cursor/skills/mixin-writing/references/expressions-language.md
+.cursor/skills/mixinmcp-tools/SKILL.md
+.cursor/skills/mixinmcp-tools/references/toolchains.md
