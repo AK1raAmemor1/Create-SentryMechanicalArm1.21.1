@@ -15,6 +15,7 @@
     "SpyglassZoomMixin"
   ],
   "client": [
+    "GunDisplayInstanceAccessor",
     "InteractKeyMixin",
     "SpyglassOverlayMixin"
   ],

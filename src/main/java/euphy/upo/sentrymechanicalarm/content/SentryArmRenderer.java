@@ -69,6 +69,14 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
 
     @Override
     protected void renderSafe(SentryArmBlockEntity be, float pt, PoseStack ms, MultiBufferSource buffer, int light, int overlay) {
+        try {
+            renderSafeInner(be, pt, ms, buffer, light, overlay);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to render SentryArmBlockEntity", e);
+        }
+    }
+
+    private void renderSafeInner(SentryArmBlockEntity be, float pt, PoseStack ms, MultiBufferSource buffer, int light, int overlay) {
 
         BlockState blockState = be.getBlockState();
         renderCog(be, ms, buffer, light, be.color);
@@ -178,9 +186,10 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
     }
 
     private void renderCog(SentryArmBlockEntity be, PoseStack ms, MultiBufferSource buffer, int light, Optional<DyeColor> color) {
+        if (SentryPartialModels.SENTRU_COG.get() == null) return;
+
         BlockState blockState = be.getBlockState();
         SuperByteBuffer cog = CachedBuffers.partial(SentryPartialModels.SENTRU_COG, blockState);
-        if (cog == null) return;
 
         Direction.Axis axis = Direction.Axis.Y;
         float angle = getAngleForBe(be, be.getBlockPos(), axis);
@@ -375,15 +384,20 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
     }
 
     private void renderArm(VertexConsumer builder, PoseStack ms, PoseStack msLocal, TransformStack msr, BlockState blockState, int color, float baseAngle, float lowerArmAngle, float upperArmAngle, float headAngle, boolean inverted, boolean hasItem, boolean isBlockItem, int light, Optional<DyeColor> dyeColor) {
-  
+        if (SentryPartialModels.SENTRU_BASE.get() == null
+                || SentryPartialModels.ARM_LOWER_BODY.get() == null
+                || SentryPartialModels.ARM_UPPER_BODY.get() == null
+                || SentryPartialModels.ARM_CLAW_BASE.get() == null
+                || SentryPartialModels.ARM_CLAW_GRIP_UPPER.get() == null
+                || SentryPartialModels.ARM_CLAW_GRIP_LOWER.get() == null)
+            return;
+
         SuperByteBuffer base = CachedBuffers.partial(SentryPartialModels.SENTRU_BASE, blockState);
         SuperByteBuffer lowerBody = CachedBuffers.partial(SentryPartialModels.ARM_LOWER_BODY, blockState);
         SuperByteBuffer upperBody = CachedBuffers.partial(SentryPartialModels.ARM_UPPER_BODY, blockState);
         SuperByteBuffer claw = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_BASE, blockState);
         SuperByteBuffer upperClawGrip = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_GRIP_UPPER, blockState);
         SuperByteBuffer lowerClawGrip = CachedBuffers.partial(SentryPartialModels.ARM_CLAW_GRIP_LOWER, blockState);
-
-        if (base == null || lowerBody == null || upperBody == null || claw == null || upperClawGrip == null || lowerClawGrip == null) return;
 
         base.light(light);
         lowerBody.light(light);
@@ -563,6 +577,15 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
                                            com.simibubi.create.foundation.virtualWorld.VirtualRenderWorld renderWorld,
                                            com.simibubi.create.content.contraptions.render.ContraptionMatrices matrices,
                                            MultiBufferSource buffer) {
+        if (SentryPartialModels.SENTRU_BASE.get() == null
+                || SentryPartialModels.ARM_LOWER_BODY.get() == null
+                || SentryPartialModels.ARM_UPPER_BODY.get() == null
+                || SentryPartialModels.ARM_CLAW_BASE.get() == null
+                || SentryPartialModels.ARM_CLAW_GRIP_UPPER.get() == null
+                || SentryPartialModels.ARM_CLAW_GRIP_LOWER.get() == null
+                || SentryPartialModels.SENTRU_COG.get() == null)
+            return;
+
         if (context.temporaryData == null || !(context.temporaryData instanceof VirtualSentryArmBlockEntity)) {
             VirtualSentryArmBlockEntity newBE = new VirtualSentryArmBlockEntity(BlockPos.ZERO, context.state);
             if (context.blockEntityData != null) {

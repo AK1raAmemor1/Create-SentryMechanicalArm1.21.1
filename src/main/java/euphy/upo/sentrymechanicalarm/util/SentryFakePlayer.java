@@ -11,7 +11,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
@@ -29,6 +31,7 @@ public class SentryFakePlayer {
     private static final Map<String, RobustFakePlayer> CONTRAPTION_FAKE_PLAYERS = new HashMap<>();
 
     private static final java.util.Map<FakePlayer, Boolean> FIRED_TRACKER = java.util.Collections.synchronizedMap(new WeakHashMap<>());
+    private static final java.util.concurrent.atomic.AtomicInteger COUNTER = new java.util.concurrent.atomic.AtomicInteger(0);
 
     public static void markFired(FakePlayer fp) {
         FIRED_TRACKER.put(fp, true);
@@ -56,6 +59,11 @@ public class SentryFakePlayer {
         @Override
         public boolean isCreative() {
             return this.fakeCreativeMode || super.isCreative();
+        }
+
+        @Override
+        public boolean isInvulnerableTo(DamageSource source) {
+            return true;
         }
 
         // justlevelingfork Compat
@@ -111,7 +119,8 @@ public class SentryFakePlayer {
     }
 
     private static RobustFakePlayer createRobustFakePlayer(ServerLevel level, String name) {
-        GameProfile profile = new GameProfile(UUID.nameUUIDFromBytes(name.getBytes()), name);
+        UUID uuid = new UUID(COUNTER.incrementAndGet(), UUID.nameUUIDFromBytes(name.getBytes()).getLeastSignificantBits());
+        GameProfile profile = new GameProfile(uuid, name);
 
         RobustFakePlayer fp = new RobustFakePlayer(level, profile);
         fp.setGameMode(GameType.SURVIVAL);
@@ -132,7 +141,75 @@ public class SentryFakePlayer {
             }
         }
 
+        try {
+            if (!level.addFreshEntity(fp)) {
+                euphy.upo.sentrymechanicalarm.SentryMechanicalArm.LOGGER.warn("addFreshEntity returned false for FakePlayer {}, UUID already exists", name);
+            }
+        } catch (Exception e) {
+            euphy.upo.sentrymechanicalarm.SentryMechanicalArm.LOGGER.error("Failed to addFreshEntity for FakePlayer {}", name, e);
+        }
+
         return fp;
+    }
+
+    public static Vec3 getMuzzlePosition(Vec3 basePos, float yaw, float pitch, double armLength) {
+        double yawRad = Math.toRadians(yaw);
+        double pitchRad = Math.toRadians(pitch);
+        return basePos.add(
+            -Math.sin(yawRad) * Math.cos(pitchRad) * armLength,
+            Math.sin(pitchRad) * armLength,
+            Math.cos(yawRad) * Math.cos(pitchRad) * armLength
+        );
+    }
+
+    public static boolean hasEntityBullet(ItemStack gunStack) {
+        IGun iGun = IGun.getIGunOrNull(gunStack);
+        if (iGun == null) return false;
+        ResourceLocation gunId = iGun.getGunId(gunStack);
+        if (gunId == null) return false;
+        String path = gunId.getPath().toLowerCase();
+        if (path.contains("rifle") || path.contains("pistol") || path.contains("smg")
+                || path.contains("shotgun") || path.contains("carbine") || path.contains("dmr")
+                || path.contains("lmg") || path.contains("machine_gun") || path.contains("marksman")
+                || path.contains("sniper") || path.contains("revolver") || path.contains("handgun")
+                || path.contains("mini_gun") || path.contains("minigun") || path.contains("blaster"))
+            return false;
+        return true;
+    }
+
+    public static double getGunArmLength(ItemStack gunStack) {
+        IGun iGun = IGun.getIGunOrNull(gunStack);
+        if (iGun == null) return 2.8;
+        ResourceLocation gunId = iGun.getGunId(gunStack);
+        if (gunId == null) return 2.8;
+        String path = gunId.getPath().toLowerCase();
+        if (path.contains("sniper") || path.contains("rpg") || path.contains("rocket") || path.contains("launcher"))
+            return 3.4;
+        if (path.contains("rifle") || path.contains("carbine") || path.contains("shotgun") || path.contains("dmr") || path.contains("lmg") || path.contains("machine_gun") || path.contains("marksman"))
+            return 3.0;
+        if (path.contains("smg") || path.contains("pistol") || path.contains("handgun") || path.contains("revolver") || path.contains("shotgun"))
+            return 2.6;
+        if (path.contains("grenade") || path.contains("throwable") || path.contains("melee"))
+            return 2.2;
+        return 2.8;
+    }
+
+    public static Vec3 getMuzzlePosition(SentryArmBlockEntity arm, float yaw, float pitch, double armLength) {
+        boolean isCeiling = arm.getBlockState().hasProperty(SentryArmBlock.CEILING) && arm.getBlockState().getValue(SentryArmBlock.CEILING);
+        double yBase = isCeiling ? -2.8 : 1.0;
+        Vec3 basePos = new Vec3(arm.getBlockPos().getX() + 0.5, arm.getBlockPos().getY() + yBase, arm.getBlockPos().getZ() + 0.5);
+        return getMuzzlePosition(basePos, yaw, pitch, armLength);
+    }
+
+    public static void remove(SentryArmBlockEntity arm) {
+        FakePlayer fp = FAKE_PLAYERS.remove(arm);
+        if (fp != null) {
+            REVERSE_MAP.remove(fp);
+            FIRED_TRACKER.remove(fp);
+            if (fp.level() instanceof ServerLevel serverLevel) {
+                fp.discard();
+            }
+        }
     }
 
     public static void sync(FakePlayer fp, SentryArmBlockEntity arm, float yaw, float pitch, ItemStack gunStack) {

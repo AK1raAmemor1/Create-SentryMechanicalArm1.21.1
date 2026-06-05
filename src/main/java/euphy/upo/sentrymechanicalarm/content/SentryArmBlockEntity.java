@@ -45,6 +45,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.entity.Entity;
@@ -142,6 +143,26 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
         lowerArmAngle = LerpedFloat.angular().startWithValue(135);
         upperArmAngle = LerpedFloat.angular().startWithValue(45);
         headAngle = LerpedFloat.angular().startWithValue(0);
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (level instanceof ServerLevel serverLevel) {
+            ItemStack held = getHeldItem();
+            boolean isGun = !held.isEmpty() && held.getItem() instanceof com.tacz.guns.api.item.IGun;
+            if (isGun) {
+                SentryFakePlayer.get(this);
+            }
+        }
+    }
+
+    @Override
+    public void onChunkUnloaded() {
+        if (level instanceof ServerLevel) {
+            SentryFakePlayer.remove(this);
+        }
+        super.onChunkUnloaded();
     }
 
     @Override
@@ -582,15 +603,15 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
         if (isInSableSubLevel()) {
             return getProjectedMuzzlePos();
         }
-        FakePlayer fp = SentryFakePlayer.get(this);
-        if (fp != null) {
-            return fp.getEyePosition();
+        boolean isCeiling = this.isCeiling();
+        float yaw = isCeiling ? baseAngle.getValue() : 180 - baseAngle.getValue();
+        float pitch = isCeiling ? headAngle.getValue() : -headAngle.getValue();
+        double armLen = SentryFakePlayer.getGunArmLength(heldItem);
+        if (SentryFakePlayer.hasEntityBullet(heldItem)) {
+            Vec3 muzzleBase = SentryFakePlayer.getMuzzlePosition(this, yaw, pitch, 0);
+            return muzzleBase.add(0, 1.62, 0);
         }
-        Vec3 basePos = this.worldPosition.getCenter().add(0, 1.5, 0);
-        if (isCeiling()) {
-            basePos = basePos.add(0, -4.0, 0);
-        }
-        return basePos;
+        return SentryFakePlayer.getMuzzlePosition(this, yaw, pitch, armLen);
     }
 
     public boolean isInSableSubLevel() {
@@ -968,11 +989,37 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
             applySentryAccuracyModifier(operator, iGunFake, fakeHeldItem, gunIndex.get().getGunData());
         }
         this.triggerHoldTime++;
+        boolean hasEntityBullet = SentryFakePlayer.hasEntityBullet(heldItem);
+
+        Vec3 originalPos = fakePlayer.position();
+        if (!hasEntityBullet) {
+            double armLen = SentryFakePlayer.getGunArmLength(heldItem);
+            Vec3 muzzlePos = SentryFakePlayer.getMuzzlePosition(this, targetYaw, targetPitch, armLen);
+            double fpY = muzzlePos.y - fakePlayer.getEyeHeight();
+            fakePlayer.setPos(muzzlePos.x, fpY, muzzlePos.z);
+            fakePlayer.xo = muzzlePos.x;
+            fakePlayer.yo = fpY;
+            fakePlayer.zo = muzzlePos.z;
+            fakePlayer.xOld = muzzlePos.x;
+            fakePlayer.yOld = fpY;
+            fakePlayer.zOld = muzzlePos.z;
+        }
+
         ShootResult result = ShootResult.UNKNOWN_FAIL;
         try {
             result = operator.shoot(() -> targetPitch, () -> targetYaw);
         } catch (Exception e) {
             LOGGER.error("Error executing operator.shoot", e);
+        }
+
+        if (!hasEntityBullet) {
+            fakePlayer.setPos(originalPos.x, originalPos.y, originalPos.z);
+            fakePlayer.xo = originalPos.x;
+            fakePlayer.yo = originalPos.y;
+            fakePlayer.zo = originalPos.z;
+            fakePlayer.xOld = originalPos.x;
+            fakePlayer.yOld = originalPos.y;
+            fakePlayer.zOld = originalPos.z;
         }
 
         boolean actuallyFired = SentryFakePlayer.checkAndClearFired(fakePlayer);
@@ -1251,8 +1298,8 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
     }
 
     private void sendShootPacket(FakePlayer fakePlayer) {
-        Vec3 realStart = fakePlayer.getEyePosition();
         Vec3 lookVec = fakePlayer.getViewVector(1.0F);
+        Vec3 realStart = fakePlayer.getEyePosition();
         Vec3 traceEnd = realStart.add(lookVec.scale(100));
         BlockHitResult hitResult = this.level.clip(new ClipContext(
                 realStart, traceEnd,

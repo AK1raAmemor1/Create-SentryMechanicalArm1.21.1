@@ -2,17 +2,20 @@ package euphy.upo.sentrymechanicalarm.content;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.logging.LogUtils;
 import com.simibubi.create.content.contraptions.behaviour.MovementContext;
 import com.simibubi.create.content.contraptions.render.ContraptionMatrices;
 import com.simibubi.create.foundation.blockEntity.renderer.SafeBlockEntityRenderer;
 import com.simibubi.create.foundation.virtualWorld.VirtualRenderWorld;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
+import euphy.upo.sentrymechanicalarm.SentryMechanicalArm;
 import euphy.upo.sentrymechanicalarm.registry.SentryPartialModels;
 import euphy.upo.sentrymechanicalarm.registry.SentryRegistry;
 import net.createmod.catnip.animation.AnimationTickHolder;
 import net.createmod.catnip.math.AngleHelper;
 import net.createmod.catnip.render.CachedBuffers;
 import net.createmod.catnip.render.SuperByteBuffer;
+import org.slf4j.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.LightTexture;
@@ -31,12 +34,21 @@ import net.minecraft.world.level.block.state.BlockState;
 import javax.annotation.Nullable;
 
 public class BlazeFireControlRenderer extends SafeBlockEntityRenderer<BlazeFireControlBlockEntity> {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     public BlazeFireControlRenderer(BlockEntityRendererProvider.Context context) {
     }
 
     @Override
     protected void renderSafe(BlazeFireControlBlockEntity be, float partialTicks, PoseStack ms, MultiBufferSource buffer, int light, int overlay) {
+        try {
+            renderSafeInner(be, partialTicks, ms, buffer, light, overlay);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to render BlazeFireControlBlockEntity", e);
+        }
+    }
+
+    private void renderSafeInner(BlazeFireControlBlockEntity be, float partialTicks, PoseStack ms, MultiBufferSource buffer, int light, int overlay) {
         if (be.getLevel() instanceof VirtualRenderWorld) {
             return;
         }
@@ -111,9 +123,12 @@ public class BlazeFireControlRenderer extends SafeBlockEntityRenderer<BlazeFireC
 
     public static void renderShared(PoseStack ms, @Nullable PoseStack modelTransform, MultiBufferSource bufferSource,
                                     BlockState state, ItemStack itemStack, float headY, float horizontalAngle) {
+        if (SentryPartialModels.BLAZE_FIRE_CONTROLLER_HEAD.get() == null
+                || SentryPartialModels.RING.get() == null
+                || SentryPartialModels.CLIPBOARD.get() == null)
+            return;
 
-        PartialModel headModel = SentryPartialModels.BLAZE_FIRE_CONTROLLER_HEAD;
-        SuperByteBuffer headBuffer = CachedBuffers.partial(headModel, state);
+        SuperByteBuffer headBuffer = CachedBuffers.partial(SentryPartialModels.BLAZE_FIRE_CONTROLLER_HEAD, state);
         if (modelTransform != null) headBuffer.transform(modelTransform);
         headBuffer.translate(0, headY, 0);
         draw(headBuffer, horizontalAngle, ms, bufferSource.getBuffer(RenderType.cutout()));

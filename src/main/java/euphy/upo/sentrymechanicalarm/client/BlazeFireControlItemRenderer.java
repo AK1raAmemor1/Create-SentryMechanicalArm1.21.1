@@ -61,20 +61,24 @@ public class BlazeFireControlItemRenderer extends BlockEntityWithoutLevelRendere
         float time = AnimationTickHolder.getRenderTime();
         float offset = Mth.sin((time / 16f) % (2 * Mth.PI)) / 16f;
 
-        SuperByteBuffer headBuffer = CachedBuffers.partial(SentryPartialModels.BLAZE_FIRE_CONTROLLER_HEAD, state);
-        if (headBuffer != null) {
-            headBuffer.translate(0.0, offset, 0.0)
-                    .rotateCentered(0, Direction.UP)
-                    .light(LightTexture.FULL_BRIGHT)
-                    .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+        if (SentryPartialModels.BLAZE_FIRE_CONTROLLER_HEAD.get() != null) {
+            SuperByteBuffer headBuffer = CachedBuffers.partial(SentryPartialModels.BLAZE_FIRE_CONTROLLER_HEAD, state);
+            if (headBuffer != null) {
+                headBuffer.translate(0.0, offset, 0.0)
+                        .rotateCentered(0, Direction.UP)
+                        .light(LightTexture.FULL_BRIGHT)
+                        .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+            }
         }
- 
-        SuperByteBuffer ringBuffer = CachedBuffers.partial(SentryPartialModels.RING, state);
-        if (ringBuffer != null) {
-            ringBuffer.translate(0.0, offset, 0.0)
-                    .rotateCentered(0, Direction.UP)
-                    .light(LightTexture.FULL_BRIGHT)
-                    .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+
+        if (SentryPartialModels.RING.get() != null) {
+            SuperByteBuffer ringBuffer = CachedBuffers.partial(SentryPartialModels.RING, state);
+            if (ringBuffer != null) {
+                ringBuffer.translate(0.0, offset, 0.0)
+                        .rotateCentered(0, Direction.UP)
+                        .light(LightTexture.FULL_BRIGHT)
+                        .renderInto(ms, buffer.getBuffer(RenderType.cutout()));
+            }
         }
 
         ms.popPose();
