@@ -12,6 +12,7 @@ import com.tacz.guns.client.resource.GunDisplayInstance;
 import com.tacz.guns.client.resource.pojo.display.gun.GunDisplay;
 import euphy.upo.sentrymechanicalarm.content.SentryArmBlock;
 import euphy.upo.sentrymechanicalarm.content.SentryArmBlockEntity;
+import euphy.upo.sentrymechanicalarm.content.VirtualSentryArmBlockEntity;
 import euphy.upo.sentrymechanicalarm.mixin.GunDisplayInstanceAccessor;
 import euphy.upo.sentrymechanicalarm.util.ArmSoundHelper;
 import euphy.upo.sentrymechanicalarm.util.SentryFakePlayer;
@@ -213,9 +214,18 @@ public class ClientPacketHandler {
                 for (var actor : contraption.getActors()) {
                     if (actor.getKey().pos().equals(msg.localPos())) {
                         MovementContext context = actor.getValue();
-                        if (context.temporaryData instanceof SentryArmBlockEntity sentry) {
-                            sentry.setLastShootTime(System.currentTimeMillis());
-                            sentry.triggerShootEffects();
+                        SentryArmBlockEntity be = null;
+                        if (context.temporaryData instanceof SentryArmBlockEntity s) {
+                            be = s;
+                        } else if (context.blockEntityData != null) {
+                            VirtualSentryArmBlockEntity vbe = VirtualSentryArmBlockEntity.fromData(
+                                    context.localPos, context.state, context.blockEntityData, context.world);
+                            context.temporaryData = vbe;
+                            be = vbe;
+                        }
+                        if (be != null) {
+                            be.setLastShootTime(System.currentTimeMillis());
+                            be.triggerShootEffects();
                         }
                         break;
                     }

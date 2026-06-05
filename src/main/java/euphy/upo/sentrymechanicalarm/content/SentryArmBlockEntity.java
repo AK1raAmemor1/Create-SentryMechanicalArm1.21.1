@@ -113,6 +113,7 @@ public class SentryArmBlockEntity extends KineticBlockEntity implements IArmAmmo
     private int releaseWatchTimer = 0;
     private boolean wasCharging = false;
     private SentryStatus currentStatus = SentryStatus.IDLE;
+    public long lastShellEjectTime = Long.MIN_VALUE;
 
     public enum SentryStatus {
         IDLE,

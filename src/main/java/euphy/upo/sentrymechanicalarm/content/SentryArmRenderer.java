@@ -745,6 +745,7 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
                 }
             }
         } catch (Exception e) {
+            LOGGER.warn("renderInContraption failed", e);
         } finally {
             ms.popPose();
         }
@@ -828,14 +829,60 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
             if (isGun) {
                 renderMuzzleFlashStatic(virtualBE, heldItem, viewStack, cleanBuffer);
 
-                if (virtualBE.shouldEjectShell()) {
+                long now = System.currentTimeMillis();
+                long lst = virtualBE.getLastShootTime();
+                if (lst > 0 && now - lst < 200 && lst != virtualBE.lastShellEjectTime) {
                     Optional<GunDisplayInstance> displayOpt = TimelessAPI.getGunDisplay(heldItem);
                     displayOpt.ifPresent(display -> {
                         if (display.getShellEjection() != null) {
-                            tryManualEjectStatic(virtualBE, heldItem, display, clawTipWorldMatrix, display.getShellEjection());
+                            BedrockGunModel gunModel = display.getGunModel();
+                            if (gunModel != null && gunModel.getRootNode() != null) {
+                                List<BedrockPart> shellPath = new ArrayList<>();
+                                if (!findPathRecursive(gunModel.getRootNode(), "shell", shellPath))
+                                    findPathRecursive(gunModel.getRootNode(), "shell_ejection", shellPath);
+                                List<BedrockPart> handPath = gunModel.getThirdPersonHandOriginPath();
+                                if (!shellPath.isEmpty() && handPath != null && !handPath.isEmpty()) {
+                                    PoseStack handCalc = new PoseStack();
+                                    for (BedrockPart p : handPath) p.translateAndRotateAndScale(handCalc);
+                                    Vector4f handLocal = new Vector4f(0,0,0,1);
+                                    handCalc.last().pose().transform(handLocal);
+                                    PoseStack shellCalc = new PoseStack();
+                                    for (BedrockPart p : shellPath) p.translateAndRotateAndScale(shellCalc);
+                                    Vector4f shellLocal = new Vector4f(0,0,0,1);
+                                    shellCalc.last().pose().transform(shellLocal);
+                                    float dx = shellLocal.x()-handLocal.x(), dy = shellLocal.y()-handLocal.y(), dz = shellLocal.z()-handLocal.z();
+                                    float gs = 0.6f;
+                                    if (display.getTransform() != null && display.getTransform().getScale() != null) {
+                                        Vector3f ts = display.getTransform().getScale().getThirdPerson();
+                                        if (ts != null) gs = ts.x();
+                                    }
+                                    Matrix4f shellMatrix = new Matrix4f(finalMatrix);
+                                    shellMatrix.mul(new Matrix4f().translate(-dx*gs, -dy*gs, dz*gs));
+                                    Vector4f worldShellPos = new Vector4f(0,0,0,1);
+                                    shellMatrix.transform(worldShellPos);
+                                    Vec3 calculatedPos = new Vec3(worldShellPos.x(), worldShellPos.y(), worldShellPos.z());
+                                    Vector3f vel = new Vector3f(0.05f,0.02f,-0.01f);
+                                    Matrix3f nm = new Matrix3f();
+                                    shellMatrix.get3x3(nm);
+                                    if (((IGun) heldItem.getItem()).getGunId(heldItem).getPath().contains("minigun")) {
+                                        Vector3f mg = new Vector3f(0.2f,0.65f,0.55f);
+                                        nm.transform(mg);
+                                        calculatedPos = calculatedPos.add(mg.x(),mg.y(),mg.z());
+                                        vel = new Vector3f(-0.11f,0.08f,-0.05f);
+                                    }
+                                    nm.transform(vel);
+                                    Vector3f accel = new Vector3f(display.getShellEjection().getAcceleration());
+                                    accel.mul(0.03f);
+                                    final Vec3 fPos = calculatedPos;
+                                    final Vector3f fVel = vel;
+                                    final Vector3f fAccel = accel;
+                                    TimelessAPI.getCommonGunIndex(((IGun) heldItem.getItem()).getGunId(heldItem)).ifPresent(idx ->
+                                        SentryShellManager.addShell(idx.getGunData().getAmmoId(), fPos, fVel, display.getShellEjection().getAngularVelocity(), fAccel, display.getShellEjection().getLivingTime()));
+                                }
+                            }
                         }
                     });
-                    virtualBE.setShellEjected();
+                    virtualBE.lastShellEjectTime = lst;
                 }
             }
 
@@ -854,82 +901,7 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
     }
 
 
-    private static void tryManualEjectStatic(SentryArmBlockEntity be, ItemStack stack, GunDisplayInstance display,
-                                              Matrix4f clawTipWorldMatrix, com.tacz.guns.client.resource.pojo.display.gun.ShellEjection ejection) {
-        BedrockGunModel gunModel = display.getGunModel();
-        if (gunModel == null) return;
 
-        List<BedrockPart> shellPath = new ArrayList<>();
-        if (!findPathRecursive(gunModel.getRootNode(), "shell", shellPath)) {
-            findPathRecursive(gunModel.getRootNode(), "shell_ejection", shellPath);
-        }
-        if (shellPath.isEmpty()) return;
-
-        List<BedrockPart> handPath = gunModel.getThirdPersonHandOriginPath();
-        if (handPath == null || handPath.isEmpty()) return;
-
-        PoseStack handMs = new PoseStack();
-        for (BedrockPart part : handPath) {
-            part.translateAndRotateAndScale(handMs);
-        }
-        Vector4f handPos = new Vector4f(0, 0, 0, 1);
-        handMs.last().pose().transform(handPos);
-
-        PoseStack shellMs = new PoseStack();
-        for (BedrockPart part : shellPath) {
-            part.translateAndRotateAndScale(shellMs);
-        }
-        Vector4f shellPos = new Vector4f(0, 0, 0, 1);
-        shellMs.last().pose().transform(shellPos);
-
-        float dx = shellPos.x() - handPos.x();
-        float dy = shellPos.y() - handPos.y();
-        float dz = shellPos.z() - handPos.z();
-
-        float gunScale = 0.6f;
-        if (display.getTransform() != null && display.getTransform().getScale() != null) {
-            Vector3f s = display.getTransform().getScale().getThirdPerson();
-            if (s != null) gunScale = s.x();
-        }
-
-        Matrix4f worldMatrix = new Matrix4f(clawTipWorldMatrix);
-        worldMatrix.mul(new Matrix4f().translate(-dx * gunScale, -dy * gunScale, dz * gunScale));
-
-        Vector4f worldOffset = new Vector4f(0, 0, 0, 1);
-        worldMatrix.transform(worldOffset);
-
-        Vec3 calculatedPos = new Vec3(worldOffset.x(), worldOffset.y(), worldOffset.z());
-
-        Vector3f calculatedVel = new Vector3f(0.05f, 0.02f, -0.01f);
-        Matrix3f normalMatrix = new Matrix3f();
-        worldMatrix.get3x3(normalMatrix);
-        normalMatrix.transform(calculatedVel);
-
-        ResourceLocation gunId = ((IGun) stack.getItem()).getGunId(stack);
-
-        if (gunId.getPath().contains("minigun")) {
-            Vector3f minigunLocalOffset = new Vector3f(0.2f, 0.65f, 0.55f);
-            normalMatrix.transform(minigunLocalOffset);
-            calculatedPos = calculatedPos.add(minigunLocalOffset.x(), minigunLocalOffset.y(), minigunLocalOffset.z());
-            calculatedVel = new Vector3f(-0.11f, 0.08f, -0.05f);
-        }
-
-        final Vec3 finalSpawnPos = calculatedPos;
-        final Vector3f finalVelocity = calculatedVel;
-        final Vector3f accel = new Vector3f(ejection.getAcceleration());
-        accel.mul(0.03f);
-
-        TimelessAPI.getCommonGunIndex(gunId).ifPresent(index -> {
-           SentryShellManager.addShell(
-                    index.getGunData().getAmmoId(),
-                   finalSpawnPos,
-                   finalVelocity,
-                    ejection.getAngularVelocity(),
-                    accel,
-                    ejection.getLivingTime()
-            );
-        });
-    }
 
     private static void renderMuzzleFlashStatic(SentryArmBlockEntity sentry, ItemStack stack, PoseStack ms, MultiBufferSource buffer) {
         boolean isSilenced = ArmSoundHelper.isSilenced(stack);
