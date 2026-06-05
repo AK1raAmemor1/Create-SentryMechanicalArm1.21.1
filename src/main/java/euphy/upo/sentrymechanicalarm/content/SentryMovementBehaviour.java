@@ -767,6 +767,10 @@ public class SentryMovementBehaviour implements MovementBehaviour {
             ));
 
             Vec3 visualStart = barrelGlobalPos.add(lookVec.scale(0.3));
+            SentryMechanicalArm.LOGGER.info("[ContraptionFireGun] sending packet contraptionId={} localPos={} start=({},{},{}) end=({},{},{})",
+                context.contraption.entity.getId(), context.localPos,
+                String.format("%.1f", visualStart.x), String.format("%.1f", visualStart.y), String.format("%.1f", visualStart.z),
+                String.format("%.1f", hitResult.getLocation().x), String.format("%.1f", hitResult.getLocation().y), String.format("%.1f", hitResult.getLocation().z));
             NetworkHandler.sendToNearby(
                     new SentryContraptionShootPacket(context.contraption.entity.getId(), context.localPos, visualStart, hitResult.getLocation(), gunStack),
                     serverLevel, BlockPos.containing(barrelGlobalPos)

@@ -3,6 +3,8 @@ package euphy.upo.sentrymechanicalarm.network;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.tacz.guns.api.TimelessAPI;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 import com.tacz.guns.api.client.animation.statemachine.LuaAnimationStateMachine;
 import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.client.animation.statemachine.GunAnimationStateContext;
@@ -39,6 +41,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public class ClientPacketHandler {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final Map<ResourceLocation, GunDisplayInstance> SENTRY_DISPLAYS = new HashMap<>();
 
@@ -215,6 +218,7 @@ public class ClientPacketHandler {
                     if (actor.getKey().pos().equals(msg.localPos())) {
                         MovementContext context = actor.getValue();
                         SentryArmBlockEntity be = null;
+                        LOGGER.info("[ContraptionShellPacket] processing pos=({}) tempData={} blockData={}", context.localPos, context.temporaryData != null ? context.temporaryData.getClass().getSimpleName() : "null", context.blockEntityData != null ? "present" : "null");
                         if (context.temporaryData instanceof SentryArmBlockEntity s) {
                             be = s;
                         } else if (context.blockEntityData != null) {

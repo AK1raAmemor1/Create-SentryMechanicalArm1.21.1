@@ -831,6 +831,7 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
 
                 long now = System.currentTimeMillis();
                 long lst = virtualBE.getLastShootTime();
+                LOGGER.info("[ContraptionShellCheck] lst={} now-lst={} lastEject={}", lst, now - lst, virtualBE.lastShellEjectTime);
                 if (lst > 0 && now - lst < 200 && lst != virtualBE.lastShellEjectTime) {
                     Optional<GunDisplayInstance> displayOpt = TimelessAPI.getGunDisplay(heldItem);
                     displayOpt.ifPresent(display -> {
