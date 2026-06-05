@@ -201,6 +201,29 @@ public class SentryFakePlayer {
         return getMuzzlePosition(basePos, yaw, pitch, armLength);
     }
 
+    public static Vec3 getContraptionLocalMuzzle(Vec3 localPosCenter, VirtualSentryArmBlockEntity virtualBE, ItemStack gunStack) {
+        boolean isCeiling = virtualBE.getBlockState().hasProperty(SentryArmBlock.CEILING) && virtualBE.getBlockState().getValue(SentryArmBlock.CEILING);
+        double yBase = isCeiling ? -2.0 : 2.0;
+
+        Vec3 basePos = new Vec3(localPosCenter.x, localPosCenter.y + yBase, localPosCenter.z);
+
+        if (hasEntityBullet(gunStack)) {
+            return basePos;
+        }
+
+        float yaw;
+        float pitch;
+        if (isCeiling) {
+            yaw = virtualBE.baseAngle.getValue();
+            pitch = virtualBE.headAngle.getValue();
+        } else {
+            yaw = 180 - virtualBE.baseAngle.getValue();
+            pitch = -virtualBE.headAngle.getValue();
+        }
+        double armLen = getGunArmLength(gunStack);
+        return getMuzzlePosition(basePos, yaw, pitch, armLen);
+    }
+
     public static void remove(SentryArmBlockEntity arm) {
         FakePlayer fp = FAKE_PLAYERS.remove(arm);
         if (fp != null) {

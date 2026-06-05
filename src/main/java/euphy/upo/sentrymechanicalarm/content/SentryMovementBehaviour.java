@@ -210,16 +210,16 @@ public class SentryMovementBehaviour implements MovementBehaviour {
         if (contraptionEntity == null) { tickIdleScan(context, virtualBE); return; }
 
         Vec3 localPosCenter = VecHelper.getCenterOf(context.localPos);
-        double yOffset = isCeiling(context) ? -2.0 : 2.0;
-        Vec3 localMuzzlePos = localPosCenter.add(0, yOffset, 0);
-        Vec3 accurateMuzzlePos = contraptionEntity.toGlobalVector(localMuzzlePos, 0.0F);
         Vec3 globalPos = contraptionEntity.toGlobalVector(localPosCenter, 0.0F);
+        ItemStack gunForMuzzle = virtualBE.getHeldItem();
+        Vec3 localMuzzlePos = SentryFakePlayer.getContraptionLocalMuzzle(localPosCenter, virtualBE, gunForMuzzle);
+        Vec3 accurateMuzzlePos = contraptionEntity.toGlobalVector(localMuzzlePos, 0.0F);
 
         if (AeronauticsHelper.isAeronauticsLoaded() && context.world != null) {
             Vec3 correctedGlobal = AeronauticsHelper.localToSimulatedWorld(context.world, localPosCenter, globalPos);
             Vec3 correctedMuzzle = AeronauticsHelper.localToSimulatedWorld(context.world, localMuzzlePos, accurateMuzzlePos);
             if (correctedGlobal.distanceToSqr(globalPos) > 0.01 || correctedMuzzle.distanceToSqr(accurateMuzzlePos) > 0.01) {
-                SentryMechanicalArm.LOGGER.info("[AeroScan] tickClientLogic coords corrected: global ({},{},{})->({},{},{}) muzzle ({},{},{})->({},{},{})",
+                SentryMechanicalArm.LOGGER.info("[AeroScan] tickClientLogic coords corrected: global=({},{},{})->({},{},{}) muzzle=({},{},{})->({},{},{})",
                     String.format("%.1f", globalPos.x), String.format("%.1f", globalPos.y), String.format("%.1f", globalPos.z),
                     String.format("%.1f", correctedGlobal.x), String.format("%.1f", correctedGlobal.y), String.format("%.1f", correctedGlobal.z),
                     String.format("%.1f", accurateMuzzlePos.x), String.format("%.1f", accurateMuzzlePos.y), String.format("%.1f", accurateMuzzlePos.z),
@@ -361,16 +361,16 @@ public class SentryMovementBehaviour implements MovementBehaviour {
     private void tickServerTargeting(MovementContext context, VirtualSentryArmBlockEntity virtualBE,
                                       AbstractContraptionEntity contraptionEntity) {
         Vec3 localPosCenter = VecHelper.getCenterOf(context.localPos);
-        double yOffset = isCeiling(context) ? -2.0 : 2.0;
-        Vec3 localMuzzlePos = localPosCenter.add(0, yOffset, 0);
-        Vec3 accurateMuzzlePos = contraptionEntity.toGlobalVector(localMuzzlePos, 0.0F);
         Vec3 globalPos = contraptionEntity.toGlobalVector(localPosCenter, 0.0F);
+        ItemStack gunForMuzzle = virtualBE.getHeldItem();
+        Vec3 localMuzzlePos = SentryFakePlayer.getContraptionLocalMuzzle(localPosCenter, virtualBE, gunForMuzzle);
+        Vec3 accurateMuzzlePos = contraptionEntity.toGlobalVector(localMuzzlePos, 0.0F);
 
         if (AeronauticsHelper.isAeronauticsLoaded() && context.world != null) {
             Vec3 correctedGlobal = AeronauticsHelper.localToSimulatedWorld(context.world, localPosCenter, globalPos);
             Vec3 correctedMuzzle = AeronauticsHelper.localToSimulatedWorld(context.world, localMuzzlePos, accurateMuzzlePos);
             if (correctedGlobal.distanceToSqr(globalPos) > 0.01 || correctedMuzzle.distanceToSqr(accurateMuzzlePos) > 0.01) {
-                SentryMechanicalArm.LOGGER.info("[AeroScan] tickServerTargeting coords corrected: global ({},{},{})->({},{},{}) muzzle ({},{},{})->({},{},{})",
+                SentryMechanicalArm.LOGGER.info("[AeroScan] tickServerTargeting coords corrected: global=({},{},{})->({},{},{}) muzzle=({},{},{})->({},{},{})",
                     String.format("%.1f", globalPos.x), String.format("%.1f", globalPos.y), String.format("%.1f", globalPos.z),
                     String.format("%.1f", correctedGlobal.x), String.format("%.1f", correctedGlobal.y), String.format("%.1f", correctedGlobal.z),
                     String.format("%.1f", accurateMuzzlePos.x), String.format("%.1f", accurateMuzzlePos.y), String.format("%.1f", accurateMuzzlePos.z),
@@ -485,10 +485,8 @@ public class SentryMovementBehaviour implements MovementBehaviour {
             }
 
             Vec3 localPosCenter = VecHelper.getCenterOf(context.localPos);
-            boolean isCeiling = context.state.hasProperty(SentryArmBlock.CEILING) && context.state.getValue(SentryArmBlock.CEILING);
-
-            double yOffset = isCeiling ? -2.0 : 2.0;
-            Vec3 localMuzzlePos = localPosCenter.add(0, yOffset, 0);
+            ItemStack gunForMuzzle = virtualBE.getHeldItem();
+            Vec3 localMuzzlePos = SentryFakePlayer.getContraptionLocalMuzzle(localPosCenter, virtualBE, gunForMuzzle);
             Vec3 accurateMuzzlePos = ace.toGlobalVector(localMuzzlePos, 0.0f);
 
             ItemStack gunStack = virtualBE.getHeldItem();
@@ -565,10 +563,12 @@ public class SentryMovementBehaviour implements MovementBehaviour {
 
         FakePlayer fp = SentryFakePlayer.getForContraption(serverLevel, context.contraption.entity.getUUID(), context.localPos);
 
-        double feetY = barrelGlobalPos.y - 1.62;
-        fp.setPos(barrelGlobalPos.x, feetY, barrelGlobalPos.z);
-        fp.xo = barrelGlobalPos.x; fp.yo = feetY; fp.zo = barrelGlobalPos.z;
-        fp.xOld = barrelGlobalPos.x; fp.yOld = feetY; fp.zOld = barrelGlobalPos.z;
+        if (!SentryFakePlayer.hasEntityBullet(gunStack)) {
+            double feetY = barrelGlobalPos.y - 1.62;
+            fp.setPos(barrelGlobalPos.x, feetY, barrelGlobalPos.z);
+            fp.xo = barrelGlobalPos.x; fp.yo = feetY; fp.zo = barrelGlobalPos.z;
+            fp.xOld = barrelGlobalPos.x; fp.yOld = feetY; fp.zOld = barrelGlobalPos.z;
+        }
 
         SentryFakePlayer.sync(fp, virtualBE, globalYaw, globalPitch, gunStack);
 
