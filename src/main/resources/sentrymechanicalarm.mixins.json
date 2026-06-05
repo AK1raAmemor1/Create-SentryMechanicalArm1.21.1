@@ -4,7 +4,9 @@
   "package": "euphy.upo.sentrymechanicalarm.mixin",
   "compatibilityLevel": "JAVA_21",
   "refmap": "sentrymechanicalarm.refmap.json",
+  "plugin": "euphy.upo.sentrymechanicalarm.mixin.SentryMixinConfigPlugin",
 "mixins": [
+    "AppleSkinCompatMixin",
     "BeltDeployerCallbacksMixin",
     "DeployerBlockEntityMixin",
     "DeployerHandlerMixin",

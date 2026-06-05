@@ -141,13 +141,10 @@ public class SentryFakePlayer {
             }
         }
 
-        try {
-            if (!level.addFreshEntity(fp)) {
-                euphy.upo.sentrymechanicalarm.SentryMechanicalArm.LOGGER.warn("addFreshEntity returned false for FakePlayer {}, UUID already exists", name);
-            }
-        } catch (Exception e) {
-            euphy.upo.sentrymechanicalarm.SentryMechanicalArm.LOGGER.error("Failed to addFreshEntity for FakePlayer {}", name, e);
-        }
+        // Not adding the fake player to the world prevents it from interfering with
+        // vanilla mechanics such as the sleep/night-skip check. The Tacz gun mod
+        // operations (shoot, inventory, capabilities) work via the object reference
+        // and do not require the fake player to be a world-registered entity.
 
         return fp;
     }
