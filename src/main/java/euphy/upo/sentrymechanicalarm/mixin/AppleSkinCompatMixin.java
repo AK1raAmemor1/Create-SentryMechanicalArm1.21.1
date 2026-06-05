@@ -7,6 +7,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+// DO NOT DELETE: Required for AppleSkin compatibility.
+// Prevents AppleSkin from sending sync packets to FakePlayers (sentry arm gunners),
+// which have null/invalid connections and would otherwise cause log spam or crashes.
+// The target method name may vary across AppleSkin versions; require=0 makes this
+// mixin optional so it silently skips when unsupported.
 @Mixin(targets = "squeek.appleskin.network.SyncHandler")
 public class AppleSkinCompatMixin {
 
