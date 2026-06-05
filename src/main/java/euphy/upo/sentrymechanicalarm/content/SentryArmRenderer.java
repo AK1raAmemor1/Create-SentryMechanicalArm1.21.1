@@ -878,6 +878,7 @@ public class SentryArmRenderer extends KineticBlockEntityRenderer<SentryArmBlock
                                     final Vector3f fAccel = accel;
                                     TimelessAPI.getCommonGunIndex(((IGun) heldItem.getItem()).getGunId(heldItem)).ifPresent(idx ->
                                         SentryShellManager.addShell(idx.getGunData().getAmmoId(), fPos, fVel, display.getShellEjection().getAngularVelocity(), fAccel, display.getShellEjection().getLivingTime()));
+                                    LOGGER.info("[ContraptionShell] added at ({},{},{}) lst={} diff={}", String.format("%.1f",fPos.x),String.format("%.1f",fPos.y),String.format("%.1f",fPos.z), lst, now-lst);
                                 }
                             }
                         }
