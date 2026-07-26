@@ -33,6 +33,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 @EventBusSubscriber(modid = SentryMechanicalArm.MODID)
@@ -56,22 +57,28 @@ public class DynamicRecipeManager {
             return;
         }
 
-        injectCuttingRecipes(recipeManager);
-        injectSequencedAssemblyRecipes(recipeManager);
-        injectPressingRecipes(recipeManager);
+        List<RecipeHolder<?>> allNewRecipes = new ArrayList<>();
+
+        allNewRecipes.addAll(injectCuttingRecipes(recipeManager));
+        allNewRecipes.addAll(injectSequencedAssemblyRecipes(recipeManager));
+        allNewRecipes.addAll(injectPressingRecipes(recipeManager));
+
+        if (!allNewRecipes.isEmpty()) {
+            injectRecipes(recipeManager, allNewRecipes);
+        }
         verifyRecipes(recipeManager);
     }
 
-    public static void injectCuttingRecipes(RecipeManager recipeManager) {
+    public static List<RecipeHolder<?>> injectCuttingRecipes(RecipeManager recipeManager) {
         var ammoEntries = TimelessAPI.getAllCommonAmmoIndex();
-        if (ammoEntries.isEmpty()) return;
+        if (ammoEntries.isEmpty()) return List.of();
 
         List<RecipeHolder<?>> newRecipes = new ArrayList<>();
         for (var entry : ammoEntries) {
             ResourceLocation ammoId = entry.getKey();
-            String path = ammoId.getPath().replace("/", "_");
+            String safePath = ammoId.getNamespace() + "_" + ammoId.getPath().replace("/", "_");
             ResourceLocation recipeId = ResourceLocation.fromNamespaceAndPath(
-                    SentryMechanicalArm.MODID, "ammo_cutting/" + path);
+                    SentryMechanicalArm.MODID, "ammo_cutting/" + safePath);
 
             ItemStack output = new ItemStack(SentryRegistry.UNFINISHED_AMMO.get());
             CompoundTag tag = new CompoundTag();
@@ -89,27 +96,25 @@ public class DynamicRecipeManager {
             newRecipes.add(new RecipeHolder<>(recipeId, recipe));
         }
 
-        if (!newRecipes.isEmpty()) {
-            injectRecipes(recipeManager, newRecipes);
-        }
+        return newRecipes;
     }
 
-    public static void injectSequencedAssemblyRecipes(RecipeManager recipeManager) {
+    public static List<RecipeHolder<?>> injectSequencedAssemblyRecipes(RecipeManager recipeManager) {
         var ammoEntries = TimelessAPI.getAllCommonAmmoIndex();
         if (ammoEntries.isEmpty()) {
             SentryMechanicalArm.LOGGER.warn("No ammo entries found from TimelessAPI");
-            return;
+            return List.of();
         }
 
-        SentryMechanicalArm.LOGGER.info("Injecting {} sequenced assembly recipes", ammoEntries.size());
+        SentryMechanicalArm.LOGGER.info("Building {} sequenced assembly recipes", ammoEntries.size());
 
         List<RecipeHolder<?>> newRecipes = new ArrayList<>();
         for (var entry : ammoEntries) {
             ResourceLocation ammoId = entry.getKey();
             AmmoRecipeConfig.Config config = getOrCreateConfig(ammoId, recipeManager);
-            String path = ammoId.getPath().replace("/", "_");
+            String safePath = ammoId.getNamespace() + "_" + ammoId.getPath().replace("/", "_");
             ResourceLocation recipeId = ResourceLocation.fromNamespaceAndPath(
-                    SentryMechanicalArm.MODID, "ammo_assembly/" + path);
+                    SentryMechanicalArm.MODID, "ammo_assembly/" + safePath);
 
             ItemStack inputUnfinished = new ItemStack(SentryRegistry.UNFINISHED_AMMO.get());
             CompoundTag inputTag = new CompoundTag();
@@ -143,22 +148,20 @@ public class DynamicRecipeManager {
             newRecipes.add(builder.build());
         }
 
-        if (!newRecipes.isEmpty()) {
-            injectRecipes(recipeManager, newRecipes);
-        }
+        return newRecipes;
     }
 
-    public static void injectPressingRecipes(RecipeManager recipeManager) {
+    public static List<RecipeHolder<?>> injectPressingRecipes(RecipeManager recipeManager) {
         var ammoEntries = TimelessAPI.getAllCommonAmmoIndex();
-        if (ammoEntries.isEmpty()) return;
+        if (ammoEntries.isEmpty()) return List.of();
 
         List<RecipeHolder<?>> newRecipes = new ArrayList<>();
         for (var entry : ammoEntries) {
             ResourceLocation ammoId = entry.getKey();
             AmmoRecipeConfig.Config config = getOrCreateConfig(ammoId, recipeManager);
-            String path = ammoId.getPath().replace("/", "_");
+            String safePath = ammoId.getNamespace() + "_" + ammoId.getPath().replace("/", "_");
             ResourceLocation pressRecipeId = ResourceLocation.fromNamespaceAndPath(
-                    SentryMechanicalArm.MODID, "ammo_pressing/" + path);
+                    SentryMechanicalArm.MODID, "ammo_pressing/" + safePath);
 
             ItemStack inputComplete = new ItemStack(SentryRegistry.UNFINISHED_AMMO.get());
             CompoundTag inputTag = new CompoundTag();
@@ -184,9 +187,7 @@ public class DynamicRecipeManager {
             newRecipes.add(new RecipeHolder<>(pressRecipeId, recipe));
         }
 
-        if (!newRecipes.isEmpty()) {
-            injectRecipes(recipeManager, newRecipes);
-        }
+        return newRecipes;
     }
 
     private static AmmoRecipeConfig.Config getOrCreateConfig(ResourceLocation ammoId, RecipeManager recipeManager) {
@@ -527,8 +528,14 @@ public class DynamicRecipeManager {
             Multimap<RecipeType<?>, RecipeHolder<?>> byType =
                     (Multimap<RecipeType<?>, RecipeHolder<?>>) byTypeField.get(recipeManager);
 
-            Collection<RecipeHolder<?>> allRecipes = new ArrayList<>(byType.values());
-            allRecipes.addAll(newRecipes);
+            LinkedHashMap<ResourceLocation, RecipeHolder<?>> deduped = new LinkedHashMap<>();
+            for (RecipeHolder<?> holder : byType.values()) {
+                deduped.put(holder.id(), holder);
+            }
+            for (RecipeHolder<?> holder : newRecipes) {
+                deduped.put(holder.id(), holder);
+            }
+            Collection<RecipeHolder<?>> allRecipes = deduped.values();
             recipeManager.replaceRecipes(allRecipes);
 
             SentryMechanicalArm.LOGGER.info(
